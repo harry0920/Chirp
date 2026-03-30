@@ -334,6 +334,26 @@ pub fn run() {
                 }
             }
 
+            // macOS: enable native stoplight buttons on settings window
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(settings_win) = app.get_webview_window("settings") {
+                    use cocoa::appkit::{NSWindow, NSWindowStyleMask, NSWindowTitleVisibility};
+                    let ns_win = settings_win.ns_window().unwrap() as cocoa::base::id;
+                    unsafe {
+                        let mut mask = ns_win.styleMask();
+                        mask |= NSWindowStyleMask::NSTitledWindowMask
+                            | NSWindowStyleMask::NSClosableWindowMask
+                            | NSWindowStyleMask::NSMiniaturizableWindowMask
+                            | NSWindowStyleMask::NSResizableWindowMask
+                            | NSWindowStyleMask::NSFullSizeContentViewWindowMask;
+                        ns_win.setStyleMask_(mask);
+                        ns_win.setTitlebarAppearsTransparent_(cocoa::base::YES);
+                        ns_win.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
+                    }
+                }
+            }
+
             // Start the global hotkey listener
             {
                 let hotkey_handle = handle.clone();

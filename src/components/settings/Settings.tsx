@@ -28,6 +28,8 @@ const PAGES: Record<string, React.FC> = {
   settings: SettingsPage,
 }
 
+const IS_MAC = navigator.platform.includes('Mac')
+
 export function Settings() {
   const settingsPage = useAppStore((s) => s.settingsPage)
   const setSettingsPage = useAppStore((s) => s.setSettingsPage)
@@ -62,33 +64,36 @@ export function Settings() {
     <div className="flex flex-col h-screen overflow-hidden no-select">
       {/* Custom titlebar */}
       <div data-tauri-drag-region className="flex items-center justify-between h-10 shrink-0 bg-sidebar">
-        {/* Logo */}
-        <div className="flex items-center gap-[8px] px-[14px] h-full">
+        {/* Logo — extra left padding on macOS to avoid overlapping stoplight buttons */}
+        <div className={`flex items-center gap-[8px] h-full ${IS_MAC ? 'pl-[78px]' : 'px-[14px]'}`}>
           <BirdMark size={18} color="#F0B723" />
           <span className="font-display font-black text-[15px] text-white tracking-[-0.5px]">
             chirp
           </span>
         </div>
-        <div className="flex items-stretch h-full">
-          <button
-            onClick={() => getCurrentWindow().minimize()}
-            className="w-[46px] flex items-center justify-center text-white/40 hover:text-white/60 transition-colors"
-          >
-            <Minus size={16} />
-          </button>
-          <button
-            onClick={() => getCurrentWindow().toggleMaximize()}
-            className="w-[46px] flex items-center justify-center text-white/40 hover:text-white/60 transition-colors"
-          >
-            <Square size={12} />
-          </button>
-          <button
-            onClick={() => getCurrentWindow().close()}
-            className="w-[46px] flex items-center justify-center text-white/40 hover:bg-red-500 hover:text-white transition-colors"
-          >
-            <X size={16} />
-          </button>
-        </div>
+        {/* Windows-only custom window controls (macOS uses native stoplight) */}
+        {!IS_MAC && (
+          <div className="flex items-stretch h-full">
+            <button
+              onClick={() => getCurrentWindow().minimize()}
+              className="w-[46px] flex items-center justify-center text-white/40 hover:text-white/60 transition-colors"
+            >
+              <Minus size={16} />
+            </button>
+            <button
+              onClick={() => getCurrentWindow().toggleMaximize()}
+              className="w-[46px] flex items-center justify-center text-white/40 hover:text-white/60 transition-colors"
+            >
+              <Square size={12} />
+            </button>
+            <button
+              onClick={() => getCurrentWindow().close()}
+              className="w-[46px] flex items-center justify-center text-white/40 hover:bg-red-500 hover:text-white transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 min-h-0">
