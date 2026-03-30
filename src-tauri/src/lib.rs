@@ -324,11 +324,12 @@ pub fn run() {
                     use cocoa::appkit::NSWindowCollectionBehavior;
                     let ns_win = overlay.ns_window().unwrap() as cocoa::base::id;
                     unsafe {
-                        // Level 25 = CGShieldingWindowLevel - 1, above fullscreen spaces
-                        ns_win.setLevel_(25);
+                        // Level 1000 = NSScreenSaverWindowLevel, above fullscreen spaces
+                        ns_win.setLevel_(1000);
                         ns_win.setCollectionBehavior_(
                             NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
                             | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
+                            | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary
                         );
                     }
                 }

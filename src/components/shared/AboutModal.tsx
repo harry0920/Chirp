@@ -140,9 +140,19 @@ export function AboutModal() {
             </p>
           )}
           {updateStatus === 'error' && (
-            <p className="mt-2 font-body text-sm text-[#888]">
-              Couldn't check for updates.
-            </p>
+            <div className="mt-2 text-center">
+              <p className="font-body text-sm text-[#888]">
+                Couldn't check for updates.
+              </p>
+              {navigator.platform.includes('Mac') && (
+                <button
+                  onClick={() => open('https://github.com/sitelift/Chirp/releases/latest/download/Chirp.dmg')}
+                  className="mt-1 font-body text-[13px] text-chirp-info hover:underline"
+                >
+                  Download latest DMG
+                </button>
+              )}
+            </div>
           )}
 
           {/* Support Chirp */}

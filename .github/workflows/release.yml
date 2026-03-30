@@ -112,15 +112,22 @@ jobs:
           prerelease: false
           args: --target aarch64-apple-darwin
 
-      - name: Upload macOS release asset with stable name
+      - name: Upload macOS release assets with stable names
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           DMG=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Chirp_*_aarch64.dmg)
           cp "$DMG" "Chirp.dmg"
+
+          # Copy update bundle (.app.tar.gz + .sig) for Tauri updater
+          TARGZ=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Chirp.app.tar.gz)
+          TARGSIG=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Chirp.app.tar.gz.sig)
+          cp "$TARGZ" "Chirp-macos-update.tar.gz"
+          cp "$TARGSIG" "Chirp-macos-update.tar.gz.sig"
+
           gh release create "v${VERSION}" --draft --title "Chirp v${VERSION}" --generate-notes 2>/dev/null || true
-          gh release upload "v${VERSION}" "Chirp.dmg" --clobber
+          gh release upload "v${VERSION}" "Chirp.dmg" "Chirp-macos-update.tar.gz" "Chirp-macos-update.tar.gz.sig" --clobber
 
       - name: Cleanup keychain
         if: always()
@@ -249,6 +256,17 @@ jobs:
           SIG_FILE="${NSIS_EXE}.sig"
           SIGNATURE=$(cat "$SIG_FILE")
 
+          # Download macOS update signature (uploaded by macOS build job)
+          MAC_SIG=""
+          for i in 1 2 3 4 5; do
+            if gh release download "v${VERSION}" -p "Chirp-macos-update.tar.gz.sig" -D /tmp/mac-sig 2>/dev/null; then
+              MAC_SIG=$(cat /tmp/mac-sig/Chirp-macos-update.tar.gz.sig)
+              break
+            fi
+            echo "Waiting for macOS signature (attempt $i)..."
+            sleep 30
+          done
+
           # Create latest.json for Tauri updater
           cat > latest.json << EOJSON
           {
@@ -259,6 +277,10 @@ jobs:
               "windows-x86_64": {
                 "signature": "${SIGNATURE}",
                 "url": "https://github.com/sitelift/Chirp/releases/download/v${VERSION}/Chirp_${VERSION}_x64-setup.exe"
+              },
+              "darwin-aarch64": {
+                "signature": "${MAC_SIG}",
+                "url": "https://github.com/sitelift/Chirp/releases/download/v${VERSION}/Chirp-macos-update.tar.gz"
               }
             }
           }
