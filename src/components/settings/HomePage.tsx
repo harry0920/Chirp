@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { trackEvent } from '@aptabase/tauri'
-import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash, ArrowUpCircle } from 'lucide-react'
+import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
@@ -161,22 +161,6 @@ export function HomePage() {
     <div className="flex flex-col gap-[10px] animate-fade-in">
       <AnnouncementBanner />
 
-      {/* Update available banner */}
-      {updateAvailable && (
-        <button
-          onClick={() => setAboutModalOpen(true)}
-          className="flex items-center gap-3 p-3 rounded-[12px] border border-chirp-yellow/30 bg-gradient-to-r from-[#FFF9E5] to-[#FEF3C7] hover:from-[#FFF5D0] hover:to-[#FDE68A] transition-all duration-200 group"
-        >
-          <ArrowUpCircle size={18} className="text-chirp-amber-500 flex-shrink-0" />
-          <span className="text-[13px] text-[#92700C] font-medium">
-            Chirp v{updateAvailable} is available
-          </span>
-          <span className="ml-auto text-[12px] text-chirp-amber-500 font-semibold group-hover:underline">
-            Update now
-          </span>
-        </button>
-      )}
-
       {/* Hero Stats Block */}
       <div className="bg-sidebar rounded-[18px] relative overflow-hidden">
         {/* Floating orbs */}
@@ -192,15 +176,28 @@ export function HomePage() {
               </h1>
               <span className="text-[12px] text-white/40 font-body">{dateStr}</span>
             </div>
-            <div className="bg-white/[0.08] backdrop-blur-sm border border-white/[0.08] rounded-full px-3 py-[5px] flex items-center gap-2">
-              <div className={`w-[7px] h-[7px] rounded-full ${
-                isDownloaded
-                  ? 'bg-green-400 shadow-status-glow animate-glow-pulse'
-                  : 'bg-chirp-amber-400'
-              }`} />
-              <span className="text-[11px] text-white/60 font-body font-medium">
-                {isDownloaded ? 'Ready' : 'Setup needed'}
-              </span>
+            <div className="flex items-center gap-2">
+              {updateAvailable && (
+                <button
+                  onClick={() => setAboutModalOpen(true)}
+                  className="bg-chirp-yellow/[0.15] backdrop-blur-sm border border-chirp-yellow/20 rounded-full px-3 py-[5px] flex items-center gap-2 hover:bg-chirp-yellow/[0.25] transition-colors"
+                >
+                  <div className="w-[7px] h-[7px] rounded-full bg-chirp-yellow animate-pulse" />
+                  <span className="text-[11px] text-chirp-yellow font-body font-medium">
+                    v{updateAvailable} available
+                  </span>
+                </button>
+              )}
+              <div className="bg-white/[0.08] backdrop-blur-sm border border-white/[0.08] rounded-full px-3 py-[5px] flex items-center gap-2">
+                <div className={`w-[7px] h-[7px] rounded-full ${
+                  isDownloaded
+                    ? 'bg-green-400 shadow-status-glow animate-glow-pulse'
+                    : 'bg-chirp-amber-400'
+                }`} />
+                <span className="text-[11px] text-white/60 font-body font-medium">
+                  {isDownloaded ? 'Ready' : 'Setup needed'}
+                </span>
+              </div>
             </div>
           </div>
 
