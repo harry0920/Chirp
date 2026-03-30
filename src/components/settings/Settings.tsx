@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getVersion } from '@tauri-apps/api/app'
+import { check } from '@tauri-apps/plugin-updater'
 import { open } from '@tauri-apps/plugin-shell'
 import { Home, BookOpen, Zap, Settings as SettingsIcon, Check, Minus, Square, X, Heart } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -38,9 +39,17 @@ export function Settings() {
   const hotkey = useAppStore((s) => s.hotkey)
   const aboutModalOpen = useAppStore((s) => s.aboutModalOpen)
   const setAboutModalOpen = useAppStore((s) => s.setAboutModalOpen)
+  const setUpdateAvailable = useAppStore((s) => s.setUpdateAvailable)
   const [appVersion, setAppVersion] = useState('...')
 
   useEffect(() => { getVersion().then(setAppVersion) }, [])
+
+  // Auto-check for updates on launch (silently, no UI blocking)
+  useEffect(() => {
+    check().then((update) => {
+      if (update) setUpdateAvailable(update.version)
+    }).catch(() => { /* network error — silently ignore */ })
+  }, [setUpdateAvailable])
 
   useEffect(() => {
     if (settingsSaved) {

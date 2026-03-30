@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { trackEvent } from '@aptabase/tauri'
-import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash } from 'lucide-react'
+import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash, ArrowUpCircle } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
@@ -154,9 +154,29 @@ export function HomePage() {
     store.setHistory([])
   }
 
+  const updateAvailable = store.updateAvailable
+  const setAboutModalOpen = useAppStore((s) => s.setAboutModalOpen)
+
   return (
     <div className="flex flex-col gap-[10px] animate-fade-in">
       <AnnouncementBanner />
+
+      {/* Update available banner */}
+      {updateAvailable && (
+        <button
+          onClick={() => setAboutModalOpen(true)}
+          className="flex items-center gap-3 p-3 rounded-[12px] border border-chirp-yellow/30 bg-gradient-to-r from-[#FFF9E5] to-[#FEF3C7] hover:from-[#FFF5D0] hover:to-[#FDE68A] transition-all duration-200 group"
+        >
+          <ArrowUpCircle size={18} className="text-chirp-amber-500 flex-shrink-0" />
+          <span className="text-[13px] text-[#92700C] font-medium">
+            Chirp v{updateAvailable} is available
+          </span>
+          <span className="ml-auto text-[12px] text-chirp-amber-500 font-semibold group-hover:underline">
+            Update now
+          </span>
+        </button>
+      )}
+
       {/* Hero Stats Block */}
       <div className="bg-sidebar rounded-[18px] relative overflow-hidden">
         {/* Floating orbs */}
