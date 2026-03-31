@@ -71,9 +71,23 @@ export function VocabularyPage() {
     }
   }
 
+  // Common English words that should never be dictionary replacement triggers
+  const COMMON_WORDS = new Set([
+    'a', 'an', 'the', 'is', 'it', 'in', 'on', 'at', 'to', 'of', 'or', 'and', 'but',
+    'for', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out',
+    'are', 'has', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'way',
+    'who', 'did', 'get', 'let', 'say', 'she', 'too', 'use', 'no', 'so', 'up',
+    'he', 'we', 'do', 'if', 'me', 'my', 'be', 'by', 'go', 'us',
+    'like', 'just', 'with', 'that', 'this', 'from', 'they', 'been', 'have',
+    'what', 'when', 'will', 'more', 'some', 'them', 'than', 'each', 'make',
+    'lock', 'block', 'on', 'off', 'man', 'men',
+  ])
+
   const addIfNew = (from: string, to: string) => {
     const cleaned = from.replace(/[.,!?;:]+$/g, '').trim()
     if (!cleaned || cleaned.toLowerCase() === to.toLowerCase()) return
+    // Reject common English words and very short words (< 3 chars)
+    if (cleaned.length < 3 || COMMON_WORDS.has(cleaned.toLowerCase())) return
     const exists = dictionary.some(
       (d) => d.from.toLowerCase() === cleaned.toLowerCase() && d.to.toLowerCase() === to.toLowerCase()
     )
@@ -94,10 +108,7 @@ export function VocabularyPage() {
     if (correctWords.length === 1 && heardWords.length > 1) {
       // Single target word, multiple heard words — add each non-trivial heard word
       for (const w of heardWords) {
-        const cleaned = w.replace(/[.,!?;:]+$/g, '').trim()
-        if (cleaned.length > 1) {
-          addIfNew(cleaned, correctWord)
-        }
+        addIfNew(w, correctWord)
       }
     } else if (correctWords.length === heardWords.length) {
       // Same word count — map each heard word to corresponding correct word
