@@ -42,7 +42,7 @@ pub fn model_exists(model: &str) -> bool {
 }
 
 /// Load a sherpa-onnx offline recognizer from disk
-pub fn load_model(model: &str, beam_search: bool, hotwords_file: Option<&str>) -> Result<SherpaRecognizer, String> {
+pub fn load_model(model: &str, beam_search: bool) -> Result<SherpaRecognizer, String> {
     let dir = model_dir(model);
     if !dir.exists() {
         return Err(format!("Model directory not found: {}", dir.display()));
@@ -67,14 +67,6 @@ pub fn load_model(model: &str, beam_search: bool, hotwords_file: Option<&str>) -
         .map(|n| (n.get() / 2).clamp(2, 6) as i32)
         .unwrap_or(4);
 
-    // Find the BPE vocab file (required for beam search hotwords)
-    let bpe_vocab = dir.join("bpe.vocab");
-    let bpe_vocab_path = if bpe_vocab.exists() {
-        Some(bpe_vocab.to_string_lossy().into_owned())
-    } else {
-        None
-    };
-
     let decoding_method = if beam_search {
         "modified_beam_search"
     } else {
@@ -98,15 +90,11 @@ pub fn load_model(model: &str, beam_search: bool, hotwords_file: Option<&str>) -
             tokens: Some(tokens.to_string_lossy().into_owned()),
             num_threads: n_threads,
             provider: Some("cpu".to_string()),
-            debug: true,
-            bpe_vocab: bpe_vocab_path,
-            modeling_unit: Some("bpe".to_string()),
+            debug: false,
             ..Default::default()
         },
         decoding_method: Some(decoding_method.to_string()),
         max_active_paths: if beam_search { 8 } else { 4 },
-        hotwords_file: hotwords_file.map(|s| s.to_string()),
-        hotwords_score: if hotwords_file.is_some() { 1.5 } else { 0.0 },
         ..Default::default()
     };
 

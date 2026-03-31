@@ -193,16 +193,7 @@ pub fn run() {
                 let mut s = state.blocking_lock();
                 let model = s.settings.model.clone();
                 if transcribe::model_exists(&model) {
-                    // Generate hotwords file if beam search is on and vocabulary is non-empty
-                    let hotwords_path = if s.settings.beam_search && !s.vocabulary.is_empty() {
-                        let app_dir = settings::config_dir();
-                        vocabulary::generate_hotwords_file(&s.vocabulary, &app_dir)
-                            .unwrap_or_else(|e| { log::error!("Failed to generate hotwords: {e}"); None })
-                    } else {
-                        None
-                    };
-                    let hotwords_str = hotwords_path.as_ref().map(|p| p.to_string_lossy().into_owned());
-                    match transcribe::load_model(&model, s.settings.beam_search, hotwords_str.as_deref()) {
+                    match transcribe::load_model(&model, s.settings.beam_search) {
                         Ok(recognizer) => {
                             s.recognizer = Some(Arc::new(recognizer));
                             log::info!("Speech model '{model}' loaded");

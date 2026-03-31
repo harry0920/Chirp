@@ -95,38 +95,19 @@ pub async fn update_settings(
     if partial.get("beamSearch").is_some() || partial.get("beam_search").is_some() {
         let model = s.settings.model.clone();
         let beam_search = s.settings.beam_search;
-        let vocabulary = s.vocabulary.clone();
         if transcribe::model_exists(&model) {
-            let hotwords_path = if beam_search && !vocabulary.is_empty() {
-                let app_dir = settings::config_dir();
-                vocabulary::generate_hotwords_file(&vocabulary, &app_dir)
-                    .unwrap_or_else(|e| { log::error!("Failed to generate hotwords: {e}"); None })
-            } else {
-                None
-            };
-            let hotwords_str = hotwords_path.as_ref().map(|p| p.to_string_lossy().into_owned());
-
-            match transcribe::load_model(&model, beam_search, hotwords_str.as_deref()) {
+            match transcribe::load_model(&model, beam_search) {
                 Ok(recognizer) => {
                     s.recognizer = Some(Arc::new(recognizer));
                     log::info!("Recognizer rebuilt (beam_search={beam_search})");
                 }
                 Err(e) => {
-                    log::error!("Failed to rebuild recognizer with beam_search={beam_search}: {e}");
-                    // Fallback: try without hotwords
-                    if hotwords_str.is_some() {
-                        match transcribe::load_model(&model, beam_search, None) {
-                            Ok(recognizer) => {
-                                s.recognizer = Some(Arc::new(recognizer));
-                                log::info!("Recognizer rebuilt without hotwords (fallback)");
-                            }
-                            Err(e2) => {
-                                log::error!("Beam search fallback failed: {e2}, trying greedy");
-                                if let Ok(recognizer) = transcribe::load_model(&model, false, None) {
-                                    s.recognizer = Some(Arc::new(recognizer));
-                                    log::info!("Recognizer rebuilt with greedy search (final fallback)");
-                                }
-                            }
+                    log::error!("Failed to rebuild recognizer: {e}");
+                    // Fallback to greedy
+                    if beam_search {
+                        if let Ok(recognizer) = transcribe::load_model(&model, false) {
+                            s.recognizer = Some(Arc::new(recognizer));
+                            log::info!("Recognizer rebuilt with greedy search (fallback)");
                         }
                     }
                 }
@@ -190,44 +171,6 @@ pub async fn update_vocabulary(
 
     // Emit settings-changed for cross-window sync
     let _ = app_handle.emit("settings-changed", serde_json::json!({ "vocabulary": entries }));
-
-    // Rebuild recognizer if beam search is active
-    if s.settings.beam_search {
-        let model = s.settings.model.clone();
-        if transcribe::model_exists(&model) {
-            let hotwords_path = if !entries.is_empty() {
-                let app_dir = settings::config_dir();
-                vocabulary::generate_hotwords_file(&entries, &app_dir)
-                    .unwrap_or_else(|e| { log::error!("Failed to generate hotwords: {e}"); None })
-            } else {
-                None
-            };
-            let hotwords_str = hotwords_path.as_ref().map(|p| p.to_string_lossy().into_owned());
-            match transcribe::load_model(&model, true, hotwords_str.as_deref()) {
-                Ok(recognizer) => {
-                    s.recognizer = Some(Arc::new(recognizer));
-                    log::info!("Recognizer rebuilt after vocabulary update");
-                }
-                Err(e) => {
-                    log::error!("Failed to rebuild recognizer with hotwords: {e}");
-                    // Fallback: try beam search without hotwords
-                    match transcribe::load_model(&model, true, None) {
-                        Ok(recognizer) => {
-                            s.recognizer = Some(Arc::new(recognizer));
-                            log::info!("Recognizer rebuilt without hotwords (fallback)");
-                        }
-                        Err(e2) => {
-                            log::error!("Beam search fallback failed: {e2}, trying greedy");
-                            if let Ok(recognizer) = transcribe::load_model(&model, false, None) {
-                                s.recognizer = Some(Arc::new(recognizer));
-                                log::info!("Recognizer rebuilt with greedy search (final fallback)");
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
     Ok(())
 }
 
@@ -557,7 +500,7 @@ pub async fn stop_recording(
     // Grab what we need from state before entering blocking thread.
     // Clone the Arc<SherpaRecognizer> so we can release the state lock
     // before the expensive transcription step.
-    let (recognizer, smart_fmt, dict, snips, ai_cleanup, llm_port, tone_mode) = {
+    let (recognizer, smart_fmt, dict, snips, ai_cleanup, llm_port, tone_mode, vocab) = {
         let s = state.lock().await;
         let rec = s.recognizer.clone().ok_or("model_not_loaded".to_string())?;
         (
@@ -568,6 +511,7 @@ pub async fn stop_recording(
             s.settings.ai_cleanup,
             s.llm_port,
             s.settings.tone_mode.clone(),
+            s.vocabulary.clone(),
         )
     };
 
@@ -636,7 +580,7 @@ pub async fn stop_recording(
         let port = llm_port.unwrap();
         let _ = app_handle.emit("recording-state", "polishing");
         log::info!("Running AI cleanup on text...");
-        match llm::cleanup_text(port, &formatted, &tone_mode).await {
+        match llm::cleanup_text(port, &formatted, &tone_mode, &vocab).await {
             Ok(cleaned) => {
                 log::info!("LLM cleanup: '{cleaned}'");
                 was_cleaned_up = true;
@@ -790,7 +734,7 @@ pub async fn download_model(
     // Load the recognizer into app state immediately so recording works
     // without requiring a restart.
     let mut s = state.lock().await;
-    let recognizer = transcribe::load_model(&model, s.settings.beam_search, None)
+    let recognizer = transcribe::load_model(&model, s.settings.beam_search)
         .map_err(|e| format!("Model downloaded but failed to load: {e}"))?;
     s.recognizer = Some(Arc::new(recognizer));
     log::info!("Recognizer loaded after model download");
@@ -950,11 +894,11 @@ pub async fn test_llm_cleanup(
     mode: Option<String>,
     state: State<'_, SharedState>,
 ) -> Result<String, String> {
-    let port = {
+    let (port, vocab) = {
         let s = state.lock().await;
-        s.llm_port.ok_or("LLM server is not running")?
+        (s.llm_port.ok_or("LLM server is not running")?, s.vocabulary.clone())
     };
-    llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string())).await
+    llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string()), &vocab).await
 }
 
 #[tauri::command]
