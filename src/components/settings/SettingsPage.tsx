@@ -537,7 +537,7 @@ export function SettingsPage() {
           </Row>
 
           {store.aiCleanup && (
-            <Row last>
+            <Row>
               <div>
                 <div className="text-[13px] font-medium text-[#1a1a1a]">Tone</div>
                 <div className="text-[11px] text-[#aaa] mt-0.5">
@@ -554,10 +554,16 @@ export function SettingsPage() {
             </Row>
           )}
 
-          {!store.aiCleanup && (
-            /* Invisible row closer — the cleanup row is last when tone is hidden */
-            <div className="hidden" />
-          )}
+          <Row last>
+            <div>
+              <div className="text-[13px] font-medium text-[#1a1a1a]">Enhanced Recognition</div>
+              <div className="text-[11px] text-[#aaa] mt-0.5">Better accuracy with accents and noise, slightly slower</div>
+            </div>
+            <Toggle
+              checked={store.beamSearch}
+              onChange={(v) => store.updateSettings({ beamSearch: v })}
+            />
+          </Row>
         </Card>
       </div>
 
