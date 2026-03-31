@@ -56,6 +56,8 @@ pub struct Settings {
     pub history_retention_days: i64,
     #[serde(default)]
     pub help_improve: bool,
+    #[serde(default)]
+    pub beam_search: bool,
 }
 
 fn default_overlay_position() -> String {
@@ -87,6 +89,7 @@ impl Default for Settings {
             tone_mode: "message".into(),
             history_retention_days: 0,
             help_improve: false,
+            beam_search: false,
         }
     }
 }
@@ -103,6 +106,13 @@ pub struct DictionaryEntry {
 pub struct SnippetEntry {
     pub trigger: String,
     pub expansion: String,
+}
+
+/// Vocabulary entry for hotword biasing during beam search
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VocabularyEntry {
+    pub word: String,
+    pub boost: f32,
 }
 
 /// Audio device info sent to frontend
@@ -157,6 +167,7 @@ pub struct AppState {
     pub settings: Settings,
     pub dictionary: Vec<DictionaryEntry>,
     pub snippets: Vec<SnippetEntry>,
+    pub vocabulary: Vec<VocabularyEntry>,
     pub history: Vec<TranscriptionEntry>,
     pub recording_state: RecordingState,
     pub recording_generation: u64,
@@ -169,11 +180,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, dictionary: Vec<DictionaryEntry>, snippets: Vec<SnippetEntry>, history: Vec<TranscriptionEntry>) -> Self {
+    pub fn new(settings: Settings, dictionary: Vec<DictionaryEntry>, snippets: Vec<SnippetEntry>, vocabulary: Vec<VocabularyEntry>, history: Vec<TranscriptionEntry>) -> Self {
         Self {
             settings,
             dictionary,
             snippets,
+            vocabulary,
             history,
             recording_state: RecordingState::Idle,
             recording_generation: 0,
