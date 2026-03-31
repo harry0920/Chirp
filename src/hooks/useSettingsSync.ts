@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from '../stores/appStore'
-import type { TranscriptionEntry } from '../stores/appStore'
+import type { TranscriptionEntry, VocabularyEntry } from '../stores/appStore'
 import { useTauri } from './useTauri'
 
 // Settings keys that should be synced to the backend
@@ -11,6 +11,7 @@ const SYNCED_KEYS = [
   'autoDismissOverlay', 'smartFormatting',
   'inputDevice', 'model', 'onboardingComplete',
   'aiCleanup',
+  'beamSearch',
   'toneMode',
   'overlayPosition',
   'showPassiveOverlay',
@@ -54,6 +55,11 @@ export function useSettingsSync() {
     tauri.getSnippets().then((entries) => {
       useAppStore.getState().setSnippets(entries)
     }).catch((e) => console.error('Failed to load snippets:', e))
+
+    // Load vocabulary
+    invoke('get_vocabulary').then((entries) => {
+      useAppStore.getState().setVocabulary(entries as VocabularyEntry[])
+    }).catch((e) => console.error('Failed to load vocabulary:', e))
 
     // Load initial hotkey status
     tauri.getHotkeyStatus().then((status) => {
@@ -145,6 +151,13 @@ export function useSettingsSync() {
         invoke('update_snippets', { entries: state.snippets }).then(() => {
           useAppStore.getState().setSettingsSaved(true)
         }).catch((e) => console.error('Failed to sync snippets:', e))
+      }
+
+      // Sync vocabulary changes
+      if (state.vocabulary !== prevState.vocabulary) {
+        invoke('update_vocabulary', { entries: state.vocabulary }).then(() => {
+          useAppStore.getState().setSettingsSaved(true)
+        }).catch((e) => console.error('Failed to sync vocabulary:', e))
       }
     })
 

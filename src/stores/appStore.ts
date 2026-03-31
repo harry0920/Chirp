@@ -14,6 +14,11 @@ export interface SnippetEntry {
   expansion: string
 }
 
+export interface VocabularyEntry {
+  word: string
+  boost: number
+}
+
 export interface TranscriptionEntry {
   text: string
   timestamp: string
@@ -49,6 +54,9 @@ export interface AppState {
   // AI Cleanup
   aiCleanup: boolean
   llmReady: boolean
+
+  // Beam Search
+  beamSearch: boolean
   llmDownloadProgress: number | null
 
   // Dictionary
@@ -56,6 +64,9 @@ export interface AppState {
 
   // Snippets
   snippets: SnippetEntry[]
+
+  // Vocabulary
+  vocabulary: VocabularyEntry[]
 
   // History
   history: TranscriptionEntry[]
@@ -107,6 +118,10 @@ export interface AppState {
   addSnippet: (trigger: string, expansion: string) => void
   updateSnippet: (index: number, trigger: string, expansion: string) => void
   removeSnippet: (index: number) => void
+  addVocabularyEntry: (word: string, boost?: number) => void
+  removeVocabularyEntry: (index: number) => void
+  updateVocabularyBoost: (index: number, boost: number) => void
+  setVocabulary: (vocabulary: VocabularyEntry[]) => void
   setSettingsLoaded: () => void
   setHistory: (history: TranscriptionEntry[]) => void
   removeHistoryEntry: (timestamp: string) => void
@@ -145,11 +160,17 @@ export const useAppStore = create<AppState>((set) => ({
   llmReady: false,
   llmDownloadProgress: null,
 
+  // Beam Search
+  beamSearch: DEFAULT_SETTINGS.beamSearch,
+
   // Dictionary
   dictionary: [],
 
   // Snippets
   snippets: [],
+
+  // Vocabulary
+  vocabulary: [],
 
   // History
   history: [],
@@ -208,6 +229,15 @@ export const useAppStore = create<AppState>((set) => ({
     })),
   removeSnippet: (index) =>
     set((state) => ({ snippets: state.snippets.filter((_, i) => i !== index) })),
+  addVocabularyEntry: (word, boost = 3.0) =>
+    set((state) => ({ vocabulary: [...state.vocabulary, { word, boost }] })),
+  removeVocabularyEntry: (index) =>
+    set((state) => ({ vocabulary: state.vocabulary.filter((_, i) => i !== index) })),
+  updateVocabularyBoost: (index, boost) =>
+    set((state) => ({
+      vocabulary: state.vocabulary.map((v, i) => (i === index ? { ...v, boost } : v)),
+    })),
+  setVocabulary: (vocabulary) => set({ vocabulary }),
   setSettingsLoaded: () => set({ settingsLoaded: true }),
   setHistory: (history) => set({ history }),
   removeHistoryEntry: (timestamp) =>

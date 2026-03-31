@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   toneMode: 'message',
   historyRetentionDays: 0,
   helpImprove: false,
+  beamSearch: false,
 }
 
 export const TONE_MODES = [
