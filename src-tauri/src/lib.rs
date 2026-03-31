@@ -14,6 +14,7 @@ mod settings;
 mod snippets;
 mod state;
 mod transcribe;
+mod vocabulary;
 
 use commands::{RecordingStartTime, ResamplerFlushState, StreamActiveState, StreamErrorState, StreamHandle};
 use state::{AppState, AudioBuffer, SharedState};

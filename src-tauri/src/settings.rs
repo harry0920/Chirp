@@ -163,6 +163,32 @@ fn default_snippets() -> Vec<SnippetEntry> {
     ]
 }
 
+fn vocabulary_path() -> PathBuf {
+    config_dir().join("vocabulary.json")
+}
+
+/// Load vocabulary from disk
+pub fn load_vocabulary() -> Vec<crate::state::VocabularyEntry> {
+    let path = vocabulary_path();
+    match std::fs::read_to_string(&path) {
+        Ok(data) => serde_json::from_str(&data).unwrap_or_else(|e| {
+            log::warn!("Corrupted vocabulary JSON, resetting: {e}");
+            Vec::new()
+        }),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Save vocabulary to disk
+pub fn save_vocabulary(entries: &[crate::state::VocabularyEntry]) -> Result<(), String> {
+    let path = vocabulary_path();
+    let data = serde_json::to_string_pretty(entries)
+        .map_err(|e| format!("Failed to serialize vocabulary: {e}"))?;
+    std::fs::write(&path, data)
+        .map_err(|e| format!("Failed to write vocabulary: {e}"))?;
+    Ok(())
+}
+
 /// Save dictionary to disk
 pub fn save_dictionary(entries: &[DictionaryEntry]) -> Result<(), String> {
     let dir = config_dir();
