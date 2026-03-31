@@ -14,7 +14,7 @@ mod settings;
 mod snippets;
 mod state;
 mod transcribe;
-mod vocabulary;
+
 
 use commands::{RecordingStartTime, ResamplerFlushState, StreamActiveState, StreamErrorState, StreamHandle};
 use state::{AppState, AudioBuffer, SharedState};
@@ -144,7 +144,6 @@ pub fn run() {
             commands::start_recording,
             commands::stop_recording,
             commands::cancel_recording,
-            commands::stop_vocabulary_training,
             commands::download_model,
             commands::get_model_status,
             commands::get_history,

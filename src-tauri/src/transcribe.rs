@@ -245,26 +245,6 @@ pub fn transcribe(
     Ok(result.text.trim().to_string())
 }
 
-/// Run transcription and return both text and raw BPE tokens
-pub fn transcribe_with_tokens(
-    recognizer: &SherpaRecognizer,
-    audio: &[f32],
-) -> Result<(String, Vec<String>), String> {
-    let stream = recognizer.0.create_stream();
-    stream.accept_waveform(16000, audio);
-
-    let start = std::time::Instant::now();
-    recognizer.0.decode(&stream);
-    let elapsed = start.elapsed();
-    log::info!("Sherpa-onnx inference took {:.0}ms (vocabulary training)", elapsed.as_millis());
-
-    let result = stream
-        .get_result()
-        .ok_or_else(|| "No recognition result".to_string())?;
-
-    Ok((result.text.trim().to_string(), result.tokens))
-}
-
 /// Split audio into overlapping chunks for transcription
 pub fn chunk_audio(samples: &[f32], sample_rate: u32, chunk_secs: f32, overlap_secs: f32) -> Vec<&[f32]> {
     let chunk_samples = (chunk_secs * sample_rate as f32) as usize;

@@ -8,7 +8,7 @@ use crate::settings;
 use crate::snippets;
 use crate::state::*;
 use crate::transcribe;
-use crate::vocabulary;
+
 use std::io::Cursor;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -172,83 +172,6 @@ pub async fn update_vocabulary(
     // Emit settings-changed for cross-window sync
     let _ = app_handle.emit("settings-changed", serde_json::json!({ "vocabulary": entries }));
     Ok(())
-}
-
-/// Stop recording and return raw transcription for vocabulary training.
-/// Unlike stop_recording, this skips cleanup, dictionary, snippets, AI, and injection.
-/// Returns the raw text the model heard — used to auto-generate dictionary entries.
-#[tauri::command]
-pub async fn stop_vocabulary_training(
-    state: State<'_, SharedState>,
-    buffer: State<'_, AudioBuffer>,
-    stream_handle: State<'_, StreamHandle>,
-    stream_error_state: State<'_, StreamErrorState>,
-    resampler_flush: State<'_, ResamplerFlushState>,
-    stream_active_state: State<'_, StreamActiveState>,
-) -> Result<String, String> {
-    // Deactivate callbacks
-    {
-        let active = stream_active_state.0.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(ref flag) = *active {
-            flag.store(false, std::sync::atomic::Ordering::SeqCst);
-        }
-    }
-
-    // Stop the audio stream
-    {
-        let mut handle = stream_handle.0.lock().unwrap_or_else(|e| e.into_inner());
-        *handle = None;
-    }
-
-    // Flush resampler
-    {
-        let flush_state = resampler_flush.0.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(ref rs) = *flush_state {
-            rs.flush(buffer.inner());
-        }
-    }
-
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-    // Get audio data
-    let audio_data = {
-        let mut buf = buffer.lock().unwrap_or_else(|e| e.into_inner());
-        let data = buf.clone();
-        buf.clear();
-        data
-    };
-
-    if audio_data.is_empty() {
-        let mut s = state.lock().await;
-        s.recording_state = RecordingState::Idle;
-        return Err("No audio captured".into());
-    }
-
-    log::info!("Vocabulary training: {} samples ({:.1}s)", audio_data.len(), audio_data.len() as f32 / 16000.0);
-
-    // Get recognizer (use greedy search version to see what model naturally produces)
-    let recognizer = {
-        let s = state.lock().await;
-        s.recognizer.clone().ok_or("model_not_loaded".to_string())?
-    };
-
-    // Transcribe raw — no cleanup, no dictionary, no injection
-    let raw_text = tokio::task::spawn_blocking(move || {
-        transcribe::transcribe(&recognizer, &audio_data)
-    })
-    .await
-    .map_err(|e| format!("Task failed: {e}"))?
-    .map_err(|e| { log::error!("Vocabulary training transcription failed: {e}"); e })?;
-
-    log::info!("Vocabulary training heard: '{raw_text}'");
-
-    // Reset recording state
-    {
-        let mut s = state.lock().await;
-        s.recording_state = RecordingState::Idle;
-    }
-
-    Ok(raw_text)
 }
 
 #[tauri::command]
