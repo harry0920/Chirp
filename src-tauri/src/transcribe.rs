@@ -42,7 +42,7 @@ pub fn model_exists(model: &str) -> bool {
 }
 
 /// Load a sherpa-onnx offline recognizer from disk
-pub fn load_model(model: &str) -> Result<SherpaRecognizer, String> {
+pub fn load_model(model: &str, beam_search: bool, hotwords_file: Option<&str>) -> Result<SherpaRecognizer, String> {
     let dir = model_dir(model);
     if !dir.exists() {
         return Err(format!("Model directory not found: {}", dir.display()));
@@ -67,10 +67,25 @@ pub fn load_model(model: &str) -> Result<SherpaRecognizer, String> {
         .map(|n| (n.get() / 2).clamp(2, 6) as i32)
         .unwrap_or(4);
 
+    // Find the BPE vocab file (required for beam search hotwords)
+    let bpe_vocab = dir.join("bpe.vocab");
+    let bpe_vocab_path = if bpe_vocab.exists() {
+        Some(bpe_vocab.to_string_lossy().into_owned())
+    } else {
+        None
+    };
+
+    let decoding_method = if beam_search {
+        "modified_beam_search"
+    } else {
+        "greedy_search"
+    };
+
     log::info!(
-        "Loading Parakeet TDT model from {} with {} threads",
+        "Loading Parakeet TDT model from {} with {} threads, decoding={}",
         dir.display(),
-        n_threads
+        n_threads,
+        decoding_method,
     );
 
     let config = OfflineRecognizerConfig {
@@ -84,9 +99,12 @@ pub fn load_model(model: &str) -> Result<SherpaRecognizer, String> {
             num_threads: n_threads,
             provider: Some("cpu".to_string()),
             debug: false,
+            bpe_vocab: bpe_vocab_path,
             ..Default::default()
         },
-        decoding_method: Some("greedy_search".to_string()),
+        decoding_method: Some(decoding_method.to_string()),
+        hotwords_file: hotwords_file.map(|s| s.to_string()),
+        hotwords_score: if hotwords_file.is_some() { 1.5 } else { 0.0 },
         ..Default::default()
     };
 

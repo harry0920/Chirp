@@ -192,7 +192,7 @@ pub fn run() {
                 let mut s = state.blocking_lock();
                 let model = s.settings.model.clone();
                 if transcribe::model_exists(&model) {
-                    match transcribe::load_model(&model) {
+                    match transcribe::load_model(&model, s.settings.beam_search, None) {
                         Ok(recognizer) => {
                             s.recognizer = Some(Arc::new(recognizer));
                             log::info!("Speech model '{model}' loaded");
