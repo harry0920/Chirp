@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 /// Pre-compiled regex patterns for text cleanup
 struct CleanupRegexes {
     fillers: Vec<Regex>,
+    correction: Regex,
     dangling_comma: Regex,
     leading_comma: Regex,
     whitespace: Regex,
@@ -99,6 +100,9 @@ fn regexes() -> &'static CleanupRegexes {
                 .iter()
                 .filter_map(|p| Regex::new(p).ok())
                 .collect(),
+            correction: Regex::new(
+                r"(?i).*\b(?:wait(?:\s+no)?|no\s+wait|oh\s+wait|actually\s+(?:wait|no)|(?:oh\s+)?no\s+(?:actually|i\s+mean[st]?)|(?:wait\s+)?i\s+mean[st]?|or\s+(?:rather|actually)|scratch\s+that|never\s*mind|sorry)\s*,?\s*"
+            ).unwrap(),
             dangling_comma: Regex::new(r",\s*,").unwrap(),
             leading_comma: Regex::new(r"^\s*,\s*").unwrap(),
             whitespace: Regex::new(r"\s{2,}").unwrap(),
@@ -126,11 +130,14 @@ pub fn cleanup_text(text: &str, smart_formatting: bool) -> String {
     // Step 1: Remove filler words
     let cleaned = remove_fillers(text);
 
+    // Step 2: Strip self-corrections — keep only the final intent
+    let cleaned = strip_corrections(&cleaned);
+
     if !smart_formatting {
         return capitalize_first(&cleaned);
     }
 
-    // Step 2: Regex-based formatting (spoken punctuation, numbers, etc.)
+    // Step 3: Regex-based formatting (spoken punctuation, numbers, etc.)
     smart_format(&cleaned)
 }
 
@@ -147,6 +154,19 @@ fn remove_fillers(text: &str) -> String {
     result = re.dangling_comma.replace_all(&result, ",").to_string();
     result = re.leading_comma.replace(&result, "").to_string();
     re.whitespace.replace_all(result.trim(), " ").to_string()
+}
+
+/// Strip everything before a self-correction signal, keeping only the final intent.
+/// "let's meet at 3 oh wait let's meet at 2" → "let's meet at 2"
+fn strip_corrections(text: &str) -> String {
+    let re = regexes();
+    let result = re.correction.replace(text, "").to_string();
+    let trimmed = result.trim();
+    if trimmed.is_empty() {
+        // Correction signal ate everything (e.g. "scratch that") — return empty
+        return String::new();
+    }
+    trimmed.to_string()
 }
 
 /// Capitalize the first character of a string
@@ -314,6 +334,42 @@ mod tests {
     fn test_new_paragraph() {
         let result = smart_format("hello new paragraph world");
         assert!(result.contains("\n\n"));
+    }
+
+    #[test]
+    fn test_correction_wait_i_mean() {
+        let result = strip_corrections("let's meet at 3 pm wait I mean 2 pm");
+        assert_eq!(result, "2 pm");
+    }
+
+    #[test]
+    fn test_correction_oh_wait() {
+        let result = strip_corrections("let's meet at 3 pm oh wait let's meet at 2 pm");
+        assert_eq!(result, "let's meet at 2 pm");
+    }
+
+    #[test]
+    fn test_correction_actually() {
+        let result = strip_corrections("the meeting is Tuesday or actually Wednesday");
+        assert_eq!(result, "Wednesday");
+    }
+
+    #[test]
+    fn test_correction_no_i_mean() {
+        let result = strip_corrections("send it to John no I mean send it to Mike");
+        assert_eq!(result, "send it to Mike");
+    }
+
+    #[test]
+    fn test_correction_scratch_that() {
+        let result = strip_corrections("add the thing scratch that");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_no_correction() {
+        let result = strip_corrections("hello world this is normal text");
+        assert_eq!(result, "hello world this is normal text");
     }
 
     #[test]

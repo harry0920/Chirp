@@ -74,16 +74,16 @@ export function Settings() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden no-select">
-      {/* Custom titlebar */}
-      <div data-tauri-drag-region className="flex items-center justify-between h-10 shrink-0 bg-sidebar">
-        {/* Logo — extra left padding on macOS to avoid overlapping stoplight buttons */}
-        <div className={`flex items-center gap-[8px] h-full ${IS_MAC ? 'pl-[78px]' : 'px-[14px]'}`}>
-          <BirdMark size={18} color="#F0B723" />
-          <span className="font-display font-black text-[15px] text-white tracking-[-0.5px]">
-            chirp
-          </span>
-        </div>
-        {/* Windows-only custom window controls (macOS uses native stoplight) */}
+      {/* Custom titlebar — macOS: drag-only region; Windows: logo + window controls */}
+      <div data-tauri-drag-region className={`flex items-center justify-between shrink-0 bg-sidebar w-full ${IS_MAC ? 'h-[34px]' : 'h-10'}`} style={IS_MAC ? { WebkitAppRegion: 'drag' } as React.CSSProperties : undefined}>
+        {!IS_MAC && (
+          <div className="flex items-center gap-[8px] px-[14px] h-full">
+            <BirdMark size={18} color="#F0B723" />
+            <span className="font-display font-black text-[15px] text-white tracking-[-0.5px]">
+              chirp
+            </span>
+          </div>
+        )}
         {!IS_MAC && (
           <div className="flex items-stretch h-full">
             <button
@@ -111,6 +111,15 @@ export function Settings() {
       <div className="flex flex-1 min-h-0">
       {/* Dark sidebar */}
       <div className="flex w-[220px] shrink-0 flex-col bg-sidebar p-[20px_12px] relative overflow-hidden sidebar-noise sidebar-glow">
+        {/* Logo in sidebar on macOS (below traffic lights) */}
+        {IS_MAC && (
+          <div className="flex items-center gap-[8px] px-[14px] mb-3 relative z-10">
+            <BirdMark size={18} color="#F0B723" />
+            <span className="font-display font-black text-[15px] text-white tracking-[-0.5px]">
+              chirp
+            </span>
+          </div>
+        )}
         {/* Nav items */}
         <nav className="flex flex-col gap-0.5 relative z-10">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
