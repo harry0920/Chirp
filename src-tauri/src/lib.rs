@@ -81,6 +81,7 @@ pub fn run() {
     };
     let initial_dictionary = settings::load_dictionary();
     let initial_snippets = settings::load_snippets();
+    let initial_vocabulary = settings::load_vocabulary();
     let mut initial_history = history::load_history();
     history::prune_history(&mut initial_history, initial_settings.history_retention_days);
     let mut builder = tauri::Builder::default()
@@ -122,6 +123,7 @@ pub fn run() {
                 initial_settings,
                 initial_dictionary,
                 initial_snippets,
+                initial_vocabulary,
                 initial_history,
             )))
         })
@@ -135,6 +137,8 @@ pub fn run() {
             commands::get_settings,
             commands::update_settings,
             commands::update_dictionary,
+            commands::get_vocabulary,
+            commands::update_vocabulary,
             commands::get_audio_devices,
             commands::get_input_level,
             commands::start_recording,

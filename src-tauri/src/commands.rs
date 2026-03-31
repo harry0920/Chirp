@@ -126,6 +126,26 @@ pub async fn update_dictionary(
 }
 
 #[tauri::command]
+pub async fn get_vocabulary(state: State<'_, SharedState>) -> Result<Vec<VocabularyEntry>, String> {
+    let s = state.lock().await;
+    Ok(s.vocabulary.clone())
+}
+
+#[tauri::command]
+pub async fn update_vocabulary(
+    entries: Vec<VocabularyEntry>,
+    state: State<'_, SharedState>,
+) -> Result<(), String> {
+    if entries.len() > 500 {
+        return Err("Vocabulary cannot exceed 500 entries".to_string());
+    }
+    let mut s = state.lock().await;
+    s.vocabulary = entries.clone();
+    settings::save_vocabulary(&s.vocabulary)?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn get_snippets(state: State<'_, SharedState>) -> Result<Vec<SnippetEntry>, String> {
     let s = state.lock().await;
     Ok(s.snippets.clone())
