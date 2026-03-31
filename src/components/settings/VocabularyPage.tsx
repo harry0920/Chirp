@@ -71,15 +71,42 @@ export function VocabularyPage() {
     }
   }
 
-  const handleAcceptTraining = (correctWord: string, heard: string) => {
-    // Check if this dictionary entry already exists
-    const alreadyExists = dictionary.some(
-      (d) => d.from.toLowerCase() === heard.toLowerCase() && d.to.toLowerCase() === correctWord.toLowerCase()
+  const addIfNew = (from: string, to: string) => {
+    const cleaned = from.replace(/[.,!?;:]+$/g, '').trim()
+    if (!cleaned || cleaned.toLowerCase() === to.toLowerCase()) return
+    const exists = dictionary.some(
+      (d) => d.from.toLowerCase() === cleaned.toLowerCase() && d.to.toLowerCase() === to.toLowerCase()
     )
-    if (!alreadyExists) {
-      addDictionaryEntry(heard, correctWord)
-      trackEvent('feature_used', { feature: 'vocabulary_train' })
+    if (!exists) {
+      addDictionaryEntry(cleaned, to)
     }
+  }
+
+  const handleAcceptTraining = (correctWord: string, heard: string) => {
+    // Strip trailing punctuation from the full phrase and add it
+    addIfNew(heard, correctWord)
+
+    // Also add individual misheard words if the correct word is a single word
+    // e.g. heard "A Keelan" for "Akilan" → also add "Keelan" → "Akilan"
+    const heardWords = heard.replace(/[.,!?;:]+$/g, '').trim().split(/\s+/)
+    const correctWords = correctWord.trim().split(/\s+/)
+
+    if (correctWords.length === 1 && heardWords.length > 1) {
+      // Single target word, multiple heard words — add each non-trivial heard word
+      for (const w of heardWords) {
+        const cleaned = w.replace(/[.,!?;:]+$/g, '').trim()
+        if (cleaned.length > 1) {
+          addIfNew(cleaned, correctWord)
+        }
+      }
+    } else if (correctWords.length === heardWords.length) {
+      // Same word count — map each heard word to corresponding correct word
+      for (let i = 0; i < heardWords.length; i++) {
+        addIfNew(heardWords[i], correctWords[i])
+      }
+    }
+
+    trackEvent('feature_used', { feature: 'vocabulary_train' })
     setTrainingResult(null)
   }
 
