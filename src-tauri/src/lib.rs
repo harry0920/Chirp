@@ -328,12 +328,33 @@ pub fn run() {
                     use cocoa::appkit::NSWindowCollectionBehavior;
                     let ns_win = overlay.ns_window().unwrap() as cocoa::base::id;
                     unsafe {
-                        // Level 25 = CGShieldingWindowLevel - 1, above fullscreen spaces
-                        ns_win.setLevel_(25);
+                        // Level 1000 = NSScreenSaverWindowLevel, above fullscreen spaces
+                        ns_win.setLevel_(1000);
                         ns_win.setCollectionBehavior_(
                             NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
                             | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
+                            | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary
                         );
+                    }
+                }
+            }
+
+            // macOS: enable native stoplight buttons on settings window
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(settings_win) = app.get_webview_window("settings") {
+                    use cocoa::appkit::{NSWindow, NSWindowStyleMask, NSWindowTitleVisibility};
+                    let ns_win = settings_win.ns_window().unwrap() as cocoa::base::id;
+                    unsafe {
+                        let mut mask = ns_win.styleMask();
+                        mask |= NSWindowStyleMask::NSTitledWindowMask
+                            | NSWindowStyleMask::NSClosableWindowMask
+                            | NSWindowStyleMask::NSMiniaturizableWindowMask
+                            | NSWindowStyleMask::NSResizableWindowMask
+                            | NSWindowStyleMask::NSFullSizeContentViewWindowMask;
+                        ns_win.setStyleMask_(mask);
+                        ns_win.setTitlebarAppearsTransparent_(cocoa::base::YES);
+                        ns_win.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
                     }
                 }
             }
@@ -379,10 +400,10 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                // Kill llama-server on app exit to prevent orphan processes (C1 fix)
+                hotkey::stop();
                 llm::kill_stale_server();
                 llm::clear_server_pid();
-                log::info!("App exiting — cleaned up LLM process");
+                log::info!("App exiting — cleaned up hotkey and LLM process");
                 let _ = app_handle; // suppress unused warning
             }
         });

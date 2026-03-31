@@ -96,6 +96,9 @@ export interface AppState {
   // About modal
   aboutModalOpen: boolean
 
+  // Update availability
+  updateAvailable: string | null  // version string, or null
+
   // Loading
   settingsLoaded: boolean
 
@@ -130,6 +133,7 @@ export interface AppState {
   setOnboardingComplete: (complete: boolean) => void
   setSettingsSaved: (saved: boolean) => void
   setAboutModalOpen: (open: boolean) => void
+  setUpdateAvailable: (version: string | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -200,6 +204,9 @@ export const useAppStore = create<AppState>((set) => ({
   // About modal
   aboutModalOpen: false,
 
+  // Update availability
+  updateAvailable: null,
+
   // Loading
   settingsLoaded: false,
 
@@ -247,4 +254,5 @@ export const useAppStore = create<AppState>((set) => ({
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
   setSettingsSaved: (settingsSaved) => set({ settingsSaved }),
   setAboutModalOpen: (aboutModalOpen) => set({ aboutModalOpen }),
+  setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
 }))
