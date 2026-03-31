@@ -144,6 +144,7 @@ pub fn run() {
             commands::start_recording,
             commands::stop_recording,
             commands::cancel_recording,
+            commands::stop_vocabulary_training,
             commands::download_model,
             commands::get_model_status,
             commands::get_history,

@@ -98,11 +98,13 @@ pub fn load_model(model: &str, beam_search: bool, hotwords_file: Option<&str>) -
             tokens: Some(tokens.to_string_lossy().into_owned()),
             num_threads: n_threads,
             provider: Some("cpu".to_string()),
-            debug: false,
+            debug: true,
             bpe_vocab: bpe_vocab_path,
+            modeling_unit: Some("bpe".to_string()),
             ..Default::default()
         },
         decoding_method: Some(decoding_method.to_string()),
+        max_active_paths: if beam_search { 8 } else { 4 },
         hotwords_file: hotwords_file.map(|s| s.to_string()),
         hotwords_score: if hotwords_file.is_some() { 1.5 } else { 0.0 },
         ..Default::default()
@@ -253,6 +255,26 @@ pub fn transcribe(
         .ok_or_else(|| "No recognition result".to_string())?;
 
     Ok(result.text.trim().to_string())
+}
+
+/// Run transcription and return both text and raw BPE tokens
+pub fn transcribe_with_tokens(
+    recognizer: &SherpaRecognizer,
+    audio: &[f32],
+) -> Result<(String, Vec<String>), String> {
+    let stream = recognizer.0.create_stream();
+    stream.accept_waveform(16000, audio);
+
+    let start = std::time::Instant::now();
+    recognizer.0.decode(&stream);
+    let elapsed = start.elapsed();
+    log::info!("Sherpa-onnx inference took {:.0}ms (vocabulary training)", elapsed.as_millis());
+
+    let result = stream
+        .get_result()
+        .ok_or_else(|| "No recognition result".to_string())?;
+
+    Ok((result.text.trim().to_string(), result.tokens))
 }
 
 /// Split audio into overlapping chunks for transcription

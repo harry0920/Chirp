@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { trackEvent } from '@aptabase/tauri'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Mic, Square, Loader2 } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { Button } from '../shared/Button'
 import { Toggle } from '../shared/Toggle'
@@ -12,9 +13,16 @@ export function VocabularyPage() {
   const updateBoost = useAppStore((s) => s.updateVocabularyBoost)
   const beamSearch = useAppStore((s) => s.beamSearch)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const addDictionaryEntry = useAppStore((s) => s.addDictionaryEntry)
+  const dictionary = useAppStore((s) => s.dictionary)
 
   const [newWord, setNewWord] = useState('')
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
+
+  // Training state
+  const [trainingIndex, setTrainingIndex] = useState<number | null>(null)
+  const [trainingState, setTrainingState] = useState<'idle' | 'recording' | 'processing'>('idle')
+  const [trainingResult, setTrainingResult] = useState<{ index: number; heard: string } | null>(null)
 
   const handleAdd = () => {
     const word = newWord.trim()
@@ -34,6 +42,47 @@ export function VocabularyPage() {
     return 'High'
   }
 
+  const handleStartTraining = async (index: number) => {
+    try {
+      setTrainingIndex(index)
+      setTrainingState('recording')
+      setTrainingResult(null)
+      await invoke('start_recording')
+    } catch (e) {
+      console.error('Failed to start training recording:', e)
+      setTrainingState('idle')
+      setTrainingIndex(null)
+    }
+  }
+
+  const handleStopTraining = async (index: number) => {
+    try {
+      setTrainingState('processing')
+      const heard = await invoke<string>('stop_vocabulary_training')
+      if (heard && heard.trim()) {
+        setTrainingResult({ index, heard: heard.trim() })
+      }
+      setTrainingState('idle')
+      setTrainingIndex(null)
+    } catch (e) {
+      console.error('Failed to stop training recording:', e)
+      setTrainingState('idle')
+      setTrainingIndex(null)
+    }
+  }
+
+  const handleAcceptTraining = (correctWord: string, heard: string) => {
+    // Check if this dictionary entry already exists
+    const alreadyExists = dictionary.some(
+      (d) => d.from.toLowerCase() === heard.toLowerCase() && d.to.toLowerCase() === correctWord.toLowerCase()
+    )
+    if (!alreadyExists) {
+      addDictionaryEntry(heard, correctWord)
+      trackEvent('feature_used', { feature: 'vocabulary_train' })
+    }
+    setTrainingResult(null)
+  }
+
   return (
     <div className="flex flex-col gap-5 animate-slide-up">
       <div className="mb-1">
@@ -41,7 +90,7 @@ export function VocabularyPage() {
           Vocabulary
         </h1>
         <p className="text-[13px] text-[#aaa] mt-1">
-          Words and names you want Chirp to recognize accurately.
+          Words and names you want Chirp to recognize accurately. Use Train to teach Chirp how you say each word.
         </p>
       </div>
 
@@ -81,63 +130,124 @@ export function VocabularyPage() {
             <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-[#aaa]">
               Word / Phrase
             </span>
-            <span className="w-24 text-[11px] font-semibold uppercase tracking-[0.5px] text-[#aaa] text-right mr-10">
+            <span className="w-20 text-[11px] font-semibold uppercase tracking-[0.5px] text-[#aaa] text-center">
+              Train
+            </span>
+            <span className="w-20 text-[11px] font-semibold uppercase tracking-[0.5px] text-[#aaa] text-right mr-10">
               Strength
             </span>
           </div>
 
           {/* Rows */}
-          {vocabulary.map((entry, i) => (
-            <div
-              key={i}
-              className={`border-b border-[#F5F4F0] last:border-b-0 transition-colors hover:bg-[#FAFAF8] group ${
-                i % 2 === 0 ? 'bg-white' : 'bg-[#FAFAF8]/50'
-              }`}
-            >
-              <div
-                className="flex items-center px-[18px] h-11 animate-slide-up"
-                style={{ animationDelay: `${i * 30}ms` }}
-              >
-                <span className="flex-1 text-[13px] text-[#333]">
-                  {entry.word}
-                </span>
-                <button
-                  onClick={() => setExpandedIndex(expandedIndex === i ? null : i)}
-                  className="flex items-center gap-1 text-[11px] text-[#aaa] hover:text-[#666] transition-colors mr-2"
-                >
-                  {boostLabel(entry.boost)}
-                  <ChevronDown
-                    size={12}
-                    className={`transition-transform duration-200 ${expandedIndex === i ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                <button
-                  onClick={() => removeEntry(i)}
-                  className="flex h-8 w-10 items-center justify-center text-[#ccc] hover:text-chirp-error transition-colors duration-150 opacity-0 group-hover:opacity-100"
-                >
-                  ✕
-                </button>
-              </div>
+          {vocabulary.map((entry, i) => {
+            const isTraining = trainingIndex === i
+            const isRecording = isTraining && trainingState === 'recording'
+            const isProcessing = isTraining && trainingState === 'processing'
+            const hasResult = trainingResult?.index === i
 
-              {/* Expanded boost slider */}
-              {expandedIndex === i && (
-                <div className="px-[18px] pb-3 pt-1 flex items-center gap-3 animate-slide-up">
-                  <span className="text-[11px] text-[#aaa] w-8">Low</span>
-                  <input
-                    type="range"
-                    min="1.0"
-                    max="5.0"
-                    step="0.5"
-                    value={entry.boost}
-                    onChange={(e) => updateBoost(i, parseFloat(e.target.value))}
-                    className="flex-1 accent-[#1a1a1a] h-1"
-                  />
-                  <span className="text-[11px] text-[#aaa] w-8 text-right">High</span>
-                  <span className="text-[11px] text-[#666] font-medium w-8 text-right">{entry.boost.toFixed(1)}</span>
+            return (
+              <div
+                key={i}
+                className={`border-b border-[#F5F4F0] last:border-b-0 transition-colors hover:bg-[#FAFAF8] group ${
+                  i % 2 === 0 ? 'bg-white' : 'bg-[#FAFAF8]/50'
+                }`}
+              >
+                <div
+                  className="flex items-center px-[18px] h-11 animate-slide-up"
+                  style={{ animationDelay: `${i * 30}ms` }}
+                >
+                  <span className="flex-1 text-[13px] text-[#333]">
+                    {entry.word}
+                  </span>
+
+                  {/* Train button */}
+                  <div className="w-20 flex justify-center">
+                    {isProcessing ? (
+                      <Loader2 size={14} className="text-[#aaa] animate-spin" />
+                    ) : isRecording ? (
+                      <button
+                        onClick={() => handleStopTraining(i)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 text-red-500 text-[11px] font-medium hover:bg-red-100 transition-colors"
+                      >
+                        <Square size={10} fill="currentColor" />
+                        Stop
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleStartTraining(i)}
+                        disabled={trainingState !== 'idle'}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[#aaa] text-[11px] hover:text-[#666] hover:bg-[#f0f0ee] transition-colors disabled:opacity-30"
+                      >
+                        <Mic size={12} />
+                        Train
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setExpandedIndex(expandedIndex === i ? null : i)}
+                    className="flex items-center gap-1 text-[11px] text-[#aaa] hover:text-[#666] transition-colors mr-2 w-20 justify-end"
+                  >
+                    {boostLabel(entry.boost)}
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform duration-200 ${expandedIndex === i ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  <button
+                    onClick={() => removeEntry(i)}
+                    className="flex h-8 w-10 items-center justify-center text-[#ccc] hover:text-chirp-error transition-colors duration-150 opacity-0 group-hover:opacity-100"
+                  >
+                    ✕
+                  </button>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Training result */}
+                {hasResult && trainingResult && (
+                  <div className="px-[18px] pb-3 pt-1 flex items-center gap-3 animate-slide-up">
+                    <span className="text-[11px] text-[#aaa]">Heard:</span>
+                    <span className="text-[12px] text-[#333] font-medium">"{trainingResult.heard}"</span>
+                    {trainingResult.heard.toLowerCase() !== entry.word.toLowerCase() ? (
+                      <>
+                        <button
+                          onClick={() => handleAcceptTraining(entry.word, trainingResult.heard)}
+                          className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors"
+                        >
+                          Add correction
+                        </button>
+                        <button
+                          onClick={() => setTrainingResult(null)}
+                          className="text-[11px] text-[#aaa] hover:text-[#666] transition-colors"
+                        >
+                          Dismiss
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-chirp-success font-medium">Perfect match!</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Expanded boost slider */}
+                {expandedIndex === i && (
+                  <div className="px-[18px] pb-3 pt-1 flex items-center gap-3 animate-slide-up">
+                    <span className="text-[11px] text-[#aaa] w-8">Low</span>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="5.0"
+                      step="0.5"
+                      value={entry.boost}
+                      onChange={(e) => updateBoost(i, parseFloat(e.target.value))}
+                      className="flex-1 accent-[#1a1a1a] h-1"
+                    />
+                    <span className="text-[11px] text-[#aaa] w-8 text-right">High</span>
+                    <span className="text-[11px] text-[#666] font-medium w-8 text-right">{entry.boost.toFixed(1)}</span>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       ) : (
         <div className="flex items-center justify-center rounded-card border border-dashed border-card-border bg-[#FAFAF8] px-6 py-10">
