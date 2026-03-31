@@ -178,6 +178,7 @@ pub async fn get_vocabulary(state: State<'_, SharedState>) -> Result<Vec<Vocabul
 #[tauri::command]
 pub async fn update_vocabulary(
     entries: Vec<VocabularyEntry>,
+    app_handle: AppHandle,
     state: State<'_, SharedState>,
 ) -> Result<(), String> {
     if entries.len() > 500 {
@@ -186,6 +187,9 @@ pub async fn update_vocabulary(
     let mut s = state.lock().await;
     s.vocabulary = entries.clone();
     settings::save_vocabulary(&s.vocabulary)?;
+
+    // Emit settings-changed for cross-window sync
+    let _ = app_handle.emit("settings-changed", serde_json::json!({ "vocabulary": entries }));
 
     // Rebuild recognizer if beam search is active
     if s.settings.beam_search {
@@ -204,7 +208,23 @@ pub async fn update_vocabulary(
                     s.recognizer = Some(Arc::new(recognizer));
                     log::info!("Recognizer rebuilt after vocabulary update");
                 }
-                Err(e) => log::error!("Failed to rebuild recognizer after vocabulary update: {e}"),
+                Err(e) => {
+                    log::error!("Failed to rebuild recognizer with hotwords: {e}");
+                    // Fallback: try beam search without hotwords
+                    match transcribe::load_model(&model, true, None) {
+                        Ok(recognizer) => {
+                            s.recognizer = Some(Arc::new(recognizer));
+                            log::info!("Recognizer rebuilt without hotwords (fallback)");
+                        }
+                        Err(e2) => {
+                            log::error!("Beam search fallback failed: {e2}, trying greedy");
+                            if let Ok(recognizer) = transcribe::load_model(&model, false, None) {
+                                s.recognizer = Some(Arc::new(recognizer));
+                                log::info!("Recognizer rebuilt with greedy search (final fallback)");
+                            }
+                        }
+                    }
+                }
             }
         }
     }

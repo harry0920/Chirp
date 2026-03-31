@@ -60,7 +60,7 @@ export function VocabularyPage() {
       </div>
 
       {/* Prerequisite banner */}
-      {!beamSearch && vocabulary.length > 0 && (
+      {!beamSearch && (
         <div className="flex items-center justify-between rounded-card border border-chirp-amber-400/30 bg-chirp-amber-400/5 px-[18px] py-3">
           <span className="text-[12px] text-[#999]">
             Enable Enhanced Recognition to use your vocabulary during transcription.
