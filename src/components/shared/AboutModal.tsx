@@ -164,26 +164,9 @@ export function AboutModal() {
             Support Chirp
           </button>
 
-          {/* Credits */}
-          <div className="mt-6 w-full rounded-xl bg-[#F5F4F0] p-4">
-            <div className="flex flex-col items-center gap-1.5">
-              <p className="font-body text-[13px] text-[#888]">
-                Made by Pieter de Bruijn
-              </p>
-              <p className="font-body text-[13px] text-[#888]">
-                Speech recognition: Parakeet TDT — NVIDIA (sherpa-onnx)
-              </p>
-              <p className="font-body text-[13px] text-[#888]">
-                Smart Cleanup: Qwen 2.5 — Alibaba
-              </p>
-              <p className="font-body text-[13px] text-[#888]">
-                Built with Tauri + React
-              </p>
-              <p className="font-body text-[12px] text-[#aaa] mt-2 text-center">
-                All processing happens on your device. Your voice and text never leave your machine.
-              </p>
-            </div>
-          </div>
+          <p className="mt-6 font-body text-[12px] text-[#aaa]">
+            Made by Pieter de Bruijn
+          </p>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { trackEvent } from '@aptabase/tauri'
-import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash, AlertTriangle } from 'lucide-react'
+import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash, AlertTriangle, Check } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
@@ -146,9 +146,11 @@ export function HomePage() {
     a.download = `chirp-history-${new Date().toISOString().slice(0, 10)}.txt`
     a.click()
     URL.revokeObjectURL(url)
+    setShowExportSuccess(true)
   }
 
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [showExportSuccess, setShowExportSuccess] = useState(false)
 
   const handleClearHistory = useCallback(async () => {
     setShowClearConfirm(false)
@@ -677,6 +679,35 @@ export function HomePage() {
                 Delete all
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export success modal */}
+      {showExportSuccess && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowExportSuccess(false)}
+        >
+          <div
+            className="bg-surface rounded-[16px] border border-card-border shadow-xl w-[360px] p-6 animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center mb-5">
+              <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mb-3">
+                <Check size={24} className="text-green-500" />
+              </div>
+              <h3 className="font-display font-bold text-[15px] text-[#1a1a1a] mb-1">History exported</h3>
+              <p className="font-body text-[13px] text-[#888]">
+                {store.history.length} {store.history.length === 1 ? 'entry' : 'entries'} saved to your downloads folder.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowExportSuccess(false)}
+              className="w-full h-[38px] rounded-[10px] bg-[#1a1a1a] font-body text-[13px] text-white hover:bg-[#333] transition-colors"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}

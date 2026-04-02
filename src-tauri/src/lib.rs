@@ -295,6 +295,7 @@ pub fn run() {
                 .on_menu_event(move |app, event| match event.id().as_ref() {
                     "settings" => {
                         if let Some(win) = app.get_webview_window("settings") {
+                            let _ = win.unminimize();
                             let _ = win.show();
                             let _ = win.set_focus();
                         }
@@ -308,6 +309,7 @@ pub fn run() {
                     }
                     "updates" => {
                         if let Some(win) = app.get_webview_window("settings") {
+                            let _ = win.unminimize();
                             let _ = win.show();
                             let _ = win.set_focus();
                         }
@@ -396,12 +398,25 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
-                hotkey::stop();
-                llm::kill_stale_server();
-                llm::clear_server_pid();
-                log::info!("App exiting — cleaned up hotkey and LLM process");
-                let _ = app_handle; // suppress unused warning
+            match event {
+                tauri::RunEvent::Exit => {
+                    hotkey::stop();
+                    llm::kill_stale_server();
+                    llm::clear_server_pid();
+                    log::info!("App exiting — cleaned up hotkey and LLM process");
+                }
+                #[cfg(target_os = "macos")]
+                tauri::RunEvent::Reopen { has_visible_windows, .. } => {
+                    // Dock icon clicked — restore the settings window
+                    if !has_visible_windows {
+                        if let Some(win) = app_handle.get_webview_window("settings") {
+                            let _ = win.unminimize();
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
+                    }
+                }
+                _ => {}
             }
         });
 }
