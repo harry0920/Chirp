@@ -253,38 +253,6 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           NSIS_EXE="src-tauri/target/release/bundle/nsis/Chirp_${VERSION}_x64-setup.exe"
-          SIG_FILE="${NSIS_EXE}.sig"
-          SIGNATURE=$(cat "$SIG_FILE")
-
-          # Download macOS update signature (uploaded by macOS build job)
-          MAC_SIG=""
-          for i in 1 2 3 4 5; do
-            if gh release download "v${VERSION}" -p "Chirp-macos-update.tar.gz.sig" -D /tmp/mac-sig 2>/dev/null; then
-              MAC_SIG=$(cat /tmp/mac-sig/Chirp-macos-update.tar.gz.sig)
-              break
-            fi
-            echo "Waiting for macOS signature (attempt $i)..."
-            sleep 30
-          done
-
-          # Create latest.json for Tauri updater
-          cat > latest.json << EOJSON
-          {
-            "version": "${VERSION}",
-            "notes": "See https://github.com/sitelift/Chirp/releases/tag/v${VERSION}",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "windows-x86_64": {
-                "signature": "${SIGNATURE}",
-                "url": "https://github.com/sitelift/Chirp/releases/download/v${VERSION}/Chirp_${VERSION}_x64-setup.exe"
-              },
-              "darwin-aarch64": {
-                "signature": "${MAC_SIG}",
-                "url": "https://github.com/sitelift/Chirp/releases/download/v${VERSION}/Chirp-macos-update.tar.gz"
-              }
-            }
-          }
-          EOJSON
 
           cp installer-wrapper/target/release/installer-wrapper.exe "Chirp-Setup.exe"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -301,14 +269,50 @@ jobs:
           # Create release if it doesn't exist (macOS job may have created it)
           gh release create "v${VERSION}" --draft --title "Chirp v${VERSION}" --generate-notes 2>/dev/null || true
 
-          # Upload Windows assets
-          gh release upload "v${VERSION}" "$NSIS_EXE" "Chirp-Setup.exe" "latest.json" --clobber
+          # Upload Windows assets (exe + sig for updater manifest)
+          SIG_FILE="${NSIS_EXE}.sig"
+          gh release upload "v${VERSION}" "$NSIS_EXE" "$SIG_FILE" "Chirp-Setup.exe" --clobber
 
   publish-release:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Generate latest.json for Tauri updater
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Download Windows installer signature
+          gh release download "v${VERSION}" -p "Chirp_${VERSION}_x64-setup.exe.sig" -D /tmp/win-sig
+          WIN_SIG=$(cat /tmp/win-sig/Chirp_${VERSION}_x64-setup.exe.sig)
+
+          # Download macOS update signature
+          gh release download "v${VERSION}" -p "Chirp-macos-update.tar.gz.sig" -D /tmp/mac-sig
+          MAC_SIG=$(cat /tmp/mac-sig/Chirp-macos-update.tar.gz.sig)
+
+          cat > latest.json << EOJSON
+          {
+            "version": "${VERSION}",
+            "notes": "See https://github.com/sitelift/Chirp/releases/tag/v${VERSION}",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "${WIN_SIG}",
+                "url": "https://github.com/sitelift/Chirp/releases/download/v${VERSION}/Chirp_${VERSION}_x64-setup.exe"
+              },
+              "darwin-aarch64": {
+                "signature": "${MAC_SIG}",
+                "url": "https://github.com/sitelift/Chirp/releases/download/v${VERSION}/Chirp-macos-update.tar.gz"
+              }
+            }
+          }
+          EOJSON
+
+          gh release upload "v${VERSION}" "latest.json" --clobber
+
       - name: Publish release (remove draft)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
