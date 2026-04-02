@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { trackEvent } from '@aptabase/tauri'
-import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash } from 'lucide-react'
+import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash, AlertTriangle } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
@@ -148,11 +148,13 @@ export function HomePage() {
     URL.revokeObjectURL(url)
   }
 
-  const handleClearHistory = async () => {
-    if (!window.confirm('Delete all transcription history? This cannot be undone.')) return
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+
+  const handleClearHistory = useCallback(async () => {
+    setShowClearConfirm(false)
     await tauri.clearHistory()
     store.setHistory([])
-  }
+  }, [tauri, store])
 
   const updateAvailable = store.updateAvailable
   const setAboutModalOpen = useAppStore((s) => s.setAboutModalOpen)
@@ -430,13 +432,22 @@ export function HomePage() {
             />
           </div>
           {store.history.length > 0 && (
-            <button
-              onClick={handleExport}
-              className="h-[36px] px-3 rounded-[10px] border border-card-border bg-white font-body text-[12px] text-[#888] flex items-center gap-1.5 hover:bg-[#FAFAF8] transition-colors flex-shrink-0"
-            >
-              <Download size={13} />
-              Export
-            </button>
+            <>
+              <button
+                onClick={() => setShowClearConfirm(true)}
+                className="h-[36px] px-3 rounded-[10px] border border-card-border bg-white font-body text-[12px] text-[#888] flex items-center gap-1.5 hover:bg-red-50 hover:text-red-400 hover:border-red-200 transition-colors flex-shrink-0"
+              >
+                <Trash2 size={13} />
+                Clear
+              </button>
+              <button
+                onClick={handleExport}
+                className="h-[36px] px-3 rounded-[10px] border border-card-border bg-white font-body text-[12px] text-[#888] flex items-center gap-1.5 hover:bg-[#FAFAF8] transition-colors flex-shrink-0"
+              >
+                <Download size={13} />
+                Export
+              </button>
+            </>
           )}
         </div>
 
@@ -629,21 +640,46 @@ export function HomePage() {
               )
             })}
 
-            {/* Clear history */}
-            {store.history.length > 0 && (
-              <div className="flex justify-end">
-                <button
-                  onClick={handleClearHistory}
-                  className="flex items-center gap-1.5 text-[12px] text-[#bbb] hover:text-red-400 transition-colors font-body"
-                >
-                  <Trash2 size={12} />
-                  Clear all history
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>
+
+      {/* Clear history confirmation modal */}
+      {showClearConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowClearConfirm(false)}
+        >
+          <div
+            className="bg-surface rounded-[16px] border border-card-border shadow-xl w-[360px] p-6 animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center mb-5">
+              <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
+                <AlertTriangle size={24} className="text-red-400" />
+              </div>
+              <h3 className="font-display font-bold text-[15px] text-[#1a1a1a] mb-1">Clear all history</h3>
+              <p className="font-body text-[13px] text-[#888]">
+                This will permanently delete all your transcription history. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 h-[38px] rounded-[10px] border border-card-border bg-white font-body text-[13px] text-[#666] hover:bg-[#FAFAF8] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearHistory}
+                className="flex-1 h-[38px] rounded-[10px] bg-red-500 font-body text-[13px] text-white hover:bg-red-600 transition-colors"
+              >
+                Delete all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

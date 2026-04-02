@@ -108,13 +108,6 @@ pub struct SnippetEntry {
     pub expansion: String,
 }
 
-/// Vocabulary entry for hotword biasing during beam search
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VocabularyEntry {
-    pub word: String,
-    pub boost: f32,
-}
-
 /// Audio device info sent to frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioDevice {
@@ -167,7 +160,6 @@ pub struct AppState {
     pub settings: Settings,
     pub dictionary: Vec<DictionaryEntry>,
     pub snippets: Vec<SnippetEntry>,
-    pub vocabulary: Vec<VocabularyEntry>,
     pub history: Vec<TranscriptionEntry>,
     pub recording_state: RecordingState,
     pub recording_generation: u64,
@@ -180,12 +172,11 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, dictionary: Vec<DictionaryEntry>, snippets: Vec<SnippetEntry>, vocabulary: Vec<VocabularyEntry>, history: Vec<TranscriptionEntry>) -> Self {
+    pub fn new(settings: Settings, dictionary: Vec<DictionaryEntry>, snippets: Vec<SnippetEntry>, history: Vec<TranscriptionEntry>) -> Self {
         Self {
             settings,
             dictionary,
             snippets,
-            vocabulary,
             history,
             recording_state: RecordingState::Idle,
             recording_generation: 0,

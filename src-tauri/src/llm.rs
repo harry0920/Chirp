@@ -165,23 +165,11 @@ Rules:
 Output ONLY: {\"cleaned_text\": \"...\"}
 Remove ^ markers.";
 
-fn system_prompt_for_mode(mode: &str, vocabulary: &[crate::state::VocabularyEntry]) -> String {
-    let base = match mode {
+fn system_prompt_for_mode(mode: &str) -> String {
+    match mode {
         "email" => EMAIL_SYSTEM_PROMPT.to_string(),
         _ => BASE_SYSTEM_PROMPT.to_string(),
-    };
-
-    if vocabulary.is_empty() {
-        return base;
     }
-
-    let words: Vec<&str> = vocabulary.iter().map(|v| v.word.as_str()).collect();
-    let vocab_instruction = format!(
-        "\n\nIMPORTANT — The user has registered these names/terms in their vocabulary: {}\nIf any words in the transcription sound phonetically similar to these terms, correct them to the exact spelling above. For example, \"Keelan\" or \"Akinan\" might be a misrecognition of a vocabulary word.",
-        words.join(", ")
-    );
-
-    format!("{base}{vocab_instruction}")
 }
 
 /// Apply datamarking: insert ^ between words to prevent instruction-following.
@@ -471,8 +459,8 @@ pub async fn stop_server(child: &mut tokio::process::Child) {
 }
 
 /// Send text through the LLM for cleanup
-pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, vocabulary: &[crate::state::VocabularyEntry]) -> Result<String, String> {
-    let prompt = system_prompt_for_mode(tone_mode, vocabulary);
+pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str) -> Result<String, String> {
+    let prompt = system_prompt_for_mode(tone_mode);
     let input_tokens_est = (text.split_whitespace().count() as f64 * 1.3) as usize;
     let max_tokens = (input_tokens_est * 2).clamp(64, 1024);
 

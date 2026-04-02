@@ -4,7 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getVersion } from '@tauri-apps/api/app'
 import { check } from '@tauri-apps/plugin-updater'
 import { open } from '@tauri-apps/plugin-shell'
-import { Home, BookOpen, Zap, Languages, Settings as SettingsIcon, Check, Minus, Square, X, Heart } from 'lucide-react'
+import { Home, BookOpen, Zap, Settings as SettingsIcon, Check, Minus, Square, X, Heart } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { BirdMark } from '../shared/BirdMark'
@@ -15,20 +15,16 @@ import { HomePage } from './HomePage'
 import { DictionaryPage } from './DictionaryPage'
 import { SnippetsPage } from './SnippetsPage'
 import { SettingsPage } from './SettingsPage'
-import { VocabularyPage } from './VocabularyPage'
-
 const NAV_ITEMS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'dictionary', label: 'Dictionary', icon: BookOpen },
   { id: 'snippets', label: 'Snippets', icon: Zap },
-  { id: 'vocabulary', label: 'Vocabulary', icon: Languages },
 ]
 
 const PAGES: Record<string, React.FC> = {
   home: HomePage,
   dictionary: DictionaryPage,
   snippets: SnippetsPage,
-  vocabulary: VocabularyPage,
   settings: SettingsPage,
 }
 

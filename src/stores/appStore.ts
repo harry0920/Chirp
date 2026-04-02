@@ -14,11 +14,6 @@ export interface SnippetEntry {
   expansion: string
 }
 
-export interface VocabularyEntry {
-  word: string
-  boost: number
-}
-
 export interface TranscriptionEntry {
   text: string
   timestamp: string
@@ -64,9 +59,6 @@ export interface AppState {
 
   // Snippets
   snippets: SnippetEntry[]
-
-  // Vocabulary
-  vocabulary: VocabularyEntry[]
 
   // History
   history: TranscriptionEntry[]
@@ -117,14 +109,11 @@ export interface AppState {
   updateSettings: (partial: Partial<AppState>) => void
   addDictionaryEntry: (from: string, to: string) => void
   removeDictionaryEntry: (index: number) => void
+  setDictionary: (dictionary: DictionaryEntry[]) => void
   setSnippets: (snippets: SnippetEntry[]) => void
   addSnippet: (trigger: string, expansion: string) => void
   updateSnippet: (index: number, trigger: string, expansion: string) => void
   removeSnippet: (index: number) => void
-  addVocabularyEntry: (word: string, boost?: number) => void
-  removeVocabularyEntry: (index: number) => void
-  updateVocabularyBoost: (index: number, boost: number) => void
-  setVocabulary: (vocabulary: VocabularyEntry[]) => void
   setSettingsLoaded: () => void
   setHistory: (history: TranscriptionEntry[]) => void
   removeHistoryEntry: (timestamp: string) => void
@@ -172,9 +161,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   // Snippets
   snippets: [],
-
-  // Vocabulary
-  vocabulary: [],
 
   // History
   history: [],
@@ -227,6 +213,7 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({ dictionary: [...state.dictionary, { from, to }] })),
   removeDictionaryEntry: (index) =>
     set((state) => ({ dictionary: state.dictionary.filter((_, i) => i !== index) })),
+  setDictionary: (dictionary) => set({ dictionary }),
   setSnippets: (snippets) => set({ snippets }),
   addSnippet: (trigger, expansion) =>
     set((state) => ({ snippets: [...state.snippets, { trigger, expansion }] })),
@@ -236,15 +223,6 @@ export const useAppStore = create<AppState>((set) => ({
     })),
   removeSnippet: (index) =>
     set((state) => ({ snippets: state.snippets.filter((_, i) => i !== index) })),
-  addVocabularyEntry: (word, boost = 3.0) =>
-    set((state) => ({ vocabulary: [...state.vocabulary, { word, boost }] })),
-  removeVocabularyEntry: (index) =>
-    set((state) => ({ vocabulary: state.vocabulary.filter((_, i) => i !== index) })),
-  updateVocabularyBoost: (index, boost) =>
-    set((state) => ({
-      vocabulary: state.vocabulary.map((v, i) => (i === index ? { ...v, boost } : v)),
-    })),
-  setVocabulary: (vocabulary) => set({ vocabulary }),
   setSettingsLoaded: () => set({ settingsLoaded: true }),
   setHistory: (history) => set({ history }),
   removeHistoryEntry: (timestamp) =>

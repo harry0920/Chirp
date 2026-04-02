@@ -137,6 +137,12 @@ pub async fn update_settings(
 }
 
 #[tauri::command]
+pub async fn get_dictionary(state: State<'_, SharedState>) -> Result<Vec<DictionaryEntry>, String> {
+    let s = state.lock().await;
+    Ok(s.dictionary.clone())
+}
+
+#[tauri::command]
 pub async fn update_dictionary(
     entries: Vec<DictionaryEntry>,
     state: State<'_, SharedState>,
@@ -147,30 +153,6 @@ pub async fn update_dictionary(
     let mut s = state.lock().await;
     s.dictionary = entries.clone();
     settings::save_dictionary(&s.dictionary)?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn get_vocabulary(state: State<'_, SharedState>) -> Result<Vec<VocabularyEntry>, String> {
-    let s = state.lock().await;
-    Ok(s.vocabulary.clone())
-}
-
-#[tauri::command]
-pub async fn update_vocabulary(
-    entries: Vec<VocabularyEntry>,
-    app_handle: AppHandle,
-    state: State<'_, SharedState>,
-) -> Result<(), String> {
-    if entries.len() > 500 {
-        return Err("Vocabulary cannot exceed 500 entries".to_string());
-    }
-    let mut s = state.lock().await;
-    s.vocabulary = entries.clone();
-    settings::save_vocabulary(&s.vocabulary)?;
-
-    // Emit settings-changed for cross-window sync
-    let _ = app_handle.emit("settings-changed", serde_json::json!({ "vocabulary": entries }));
     Ok(())
 }
 
@@ -423,7 +405,7 @@ pub async fn stop_recording(
     // Grab what we need from state before entering blocking thread.
     // Clone the Arc<SherpaRecognizer> so we can release the state lock
     // before the expensive transcription step.
-    let (recognizer, smart_fmt, dict, snips, ai_cleanup, llm_port, tone_mode, vocab) = {
+    let (recognizer, smart_fmt, dict, snips, ai_cleanup, llm_port, tone_mode) = {
         let s = state.lock().await;
         let rec = s.recognizer.clone().ok_or("model_not_loaded".to_string())?;
         (
@@ -434,7 +416,6 @@ pub async fn stop_recording(
             s.settings.ai_cleanup,
             s.llm_port,
             s.settings.tone_mode.clone(),
-            s.vocabulary.clone(),
         )
     };
 
@@ -503,7 +484,7 @@ pub async fn stop_recording(
         let port = llm_port.unwrap();
         let _ = app_handle.emit("recording-state", "polishing");
         log::info!("Running AI cleanup on text...");
-        match llm::cleanup_text(port, &formatted, &tone_mode, &vocab).await {
+        match llm::cleanup_text(port, &formatted, &tone_mode).await {
             Ok(cleaned) => {
                 log::info!("LLM cleanup: '{cleaned}'");
                 was_cleaned_up = true;
@@ -817,11 +798,11 @@ pub async fn test_llm_cleanup(
     mode: Option<String>,
     state: State<'_, SharedState>,
 ) -> Result<String, String> {
-    let (port, vocab) = {
+    let port = {
         let s = state.lock().await;
-        (s.llm_port.ok_or("LLM server is not running")?, s.vocabulary.clone())
+        s.llm_port.ok_or("LLM server is not running")?
     };
-    llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string()), &vocab).await
+    llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string())).await
 }
 
 #[tauri::command]
