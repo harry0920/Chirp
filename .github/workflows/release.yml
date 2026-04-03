@@ -95,24 +95,24 @@ jobs:
           done
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Chirp ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download and install Chirp."
-          releaseDraft: true
-          prerelease: false
-          args: --target aarch64-apple-darwin
+        run: npx tauri build --target aarch64-apple-darwin
 
-      - name: Upload macOS release assets with stable names
+      - name: Sign update bundle with Tauri updater key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          TARGZ=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Chirp.app.tar.gz)
+          npx tauri signer sign "$TARGZ"
+
+      - name: Upload macOS release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -120,9 +120,8 @@ jobs:
           DMG=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Chirp_*_aarch64.dmg)
           cp "$DMG" "Chirp.dmg"
 
-          # Copy update bundle (.app.tar.gz + .sig) for Tauri updater
           TARGZ=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Chirp.app.tar.gz)
-          TARGSIG=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Chirp.app.tar.gz.sig)
+          TARGSIG="${TARGZ}.sig"
           cp "$TARGZ" "Chirp-macos-update.tar.gz"
           cp "$TARGSIG" "Chirp-macos-update.tar.gz.sig"
 
