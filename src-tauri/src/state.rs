@@ -58,6 +58,12 @@ pub struct Settings {
     pub help_improve: bool,
     #[serde(default)]
     pub beam_search: bool,
+    #[serde(default = "default_cleanup_model")]
+    pub cleanup_model: String,
+}
+
+fn default_cleanup_model() -> String {
+    "qwen".into()
 }
 
 fn default_overlay_position() -> String {
@@ -90,6 +96,7 @@ impl Default for Settings {
             history_retention_days: 0,
             help_improve: false,
             beam_search: false,
+            cleanup_model: "qwen".into(),
         }
     }
 }
