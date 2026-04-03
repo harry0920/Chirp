@@ -405,7 +405,7 @@ pub async fn stop_recording(
     // Grab what we need from state before entering blocking thread.
     // Clone the Arc<SherpaRecognizer> so we can release the state lock
     // before the expensive transcription step.
-    let (recognizer, smart_fmt, dict, snips, ai_cleanup, llm_port, tone_mode) = {
+    let (recognizer, smart_fmt, dict, snips, ai_cleanup, llm_port, tone_mode, cleanup_model) = {
         let s = state.lock().await;
         let rec = s.recognizer.clone().ok_or("model_not_loaded".to_string())?;
         (
@@ -416,6 +416,7 @@ pub async fn stop_recording(
             s.settings.ai_cleanup,
             s.llm_port,
             s.settings.tone_mode.clone(),
+            s.settings.cleanup_model.clone(),
         )
     };
 
@@ -483,8 +484,13 @@ pub async fn stop_recording(
     let after_llm = if ai_cleanup && llm_port.is_some() {
         let port = llm_port.unwrap();
         let _ = app_handle.emit("recording-state", "polishing");
-        log::info!("Running AI cleanup on text...");
-        match llm::cleanup_text(port, &formatted, &tone_mode).await {
+        log::info!("Running AI cleanup ({cleanup_model}) on text...");
+        let cleanup_result = if cleanup_model == "chirp-cleanup" {
+            t5::cleanup_text(port, &formatted).await
+        } else {
+            llm::cleanup_text(port, &formatted, &tone_mode).await
+        };
+        match cleanup_result {
             Ok(cleaned) => {
                 log::info!("LLM cleanup: '{cleaned}'");
                 was_cleaned_up = true;
@@ -730,9 +736,10 @@ pub async fn get_llm_status(
     state: State<'_, SharedState>,
 ) -> Result<llm::LlmStatus, String> {
     let s = state.lock().await;
+    let is_t5 = s.settings.cleanup_model == "chirp-cleanup";
     Ok(llm::LlmStatus {
-        binary_downloaded: llm::binary_exists(),
-        model_downloaded: llm::model_exists(),
+        binary_downloaded: if is_t5 { true } else { llm::binary_exists() },
+        model_downloaded: if is_t5 { t5::model_exists() } else { llm::model_exists() },
         server_running: s.llm_port.is_some(),
     })
 }
@@ -740,9 +747,18 @@ pub async fn get_llm_status(
 #[tauri::command]
 pub async fn download_llm(
     app_handle: AppHandle,
+    state: State<'_, SharedState>,
 ) -> Result<(), String> {
-    llm::download_binary(&app_handle).await?;
-    llm::download_model(&app_handle).await?;
+    let is_t5 = {
+        let s = state.lock().await;
+        s.settings.cleanup_model == "chirp-cleanup"
+    };
+    if is_t5 {
+        t5::download_model(&app_handle).await?;
+    } else {
+        llm::download_binary(&app_handle).await?;
+        llm::download_model(&app_handle).await?;
+    }
     Ok(())
 }
 
@@ -766,7 +782,15 @@ pub async fn start_llm(
             .port()
     };
 
-    let child = llm::start_server(port).await?;
+    let is_t5 = {
+        let s = state.lock().await;
+        s.settings.cleanup_model == "chirp-cleanup"
+    };
+    let child = if is_t5 {
+        t5::start_server(port).await?
+    } else {
+        llm::start_server(port).await?
+    };
 
     let mut s = state.lock().await;
     if let Some(pid) = child.id() {
@@ -802,7 +826,15 @@ pub async fn test_llm_cleanup(
         let s = state.lock().await;
         s.llm_port.ok_or("LLM server is not running")?
     };
-    llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string())).await
+    let cleanup_model = {
+        let s = state.lock().await;
+        s.settings.cleanup_model.clone()
+    };
+    if cleanup_model == "chirp-cleanup" {
+        t5::cleanup_text(port, &text).await
+    } else {
+        llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string())).await
+    }
 }
 
 #[tauri::command]
