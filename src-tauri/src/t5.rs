@@ -110,13 +110,51 @@ pub async fn download_model(app_handle: &AppHandle) -> Result<(), String> {
 
 /// Find Python executable
 fn find_python() -> Option<String> {
-    for candidate in &["python3", "python", "python.exe"] {
+    // Try PATH candidates first
+    for candidate in &["python3", "python"] {
         if let Ok(output) = std::process::Command::new(candidate)
             .arg("--version")
             .output()
         {
             if output.status.success() {
-                return Some(candidate.to_string());
+                let ver = String::from_utf8_lossy(&output.stdout);
+                let ver2 = String::from_utf8_lossy(&output.stderr);
+                // Windows Store stub returns success but prints nothing useful
+                if ver.contains("Python") || ver2.contains("Python") {
+                    return Some(candidate.to_string());
+                }
+            }
+        }
+    }
+    // Try common Windows Python install locations
+    #[cfg(windows)]
+    {
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            let base = std::path::PathBuf::from(&local).join("Python");
+            if let Ok(entries) = std::fs::read_dir(&base) {
+                for entry in entries.flatten() {
+                    let python = entry.path().join("python.exe");
+                    if python.exists() {
+                        if let Ok(output) = std::process::Command::new(&python)
+                            .arg("--version")
+                            .output()
+                        {
+                            if output.status.success() {
+                                return Some(python.to_string_lossy().to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            // Also check Programs/Python
+            let programs = std::path::PathBuf::from(&local).join("Programs").join("Python");
+            if let Ok(entries) = std::fs::read_dir(&programs) {
+                for entry in entries.flatten() {
+                    let python = entry.path().join("python.exe");
+                    if python.exists() {
+                        return Some(python.to_string_lossy().to_string());
+                    }
+                }
             }
         }
     }
