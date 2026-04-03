@@ -4,6 +4,7 @@ use crate::dictionary;
 use crate::history;
 use crate::inject;
 use crate::llm;
+use crate::t5;
 use crate::settings;
 use crate::snippets;
 use crate::state::*;
