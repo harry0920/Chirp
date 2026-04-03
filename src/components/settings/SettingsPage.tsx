@@ -6,7 +6,7 @@ import { useHotkeyRecorder } from '../../hooks/useHotkeyRecorder'
 import type { AudioDevice } from '../../hooks/useTauri'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
 import { useLlmDownloaded } from '../../hooks/useLlmDownloaded'
-import { TONE_MODES, STT_MODELS, LLM_MODEL } from '../../lib/constants'
+import { TONE_MODES, CLEANUP_MODELS, STT_MODELS, LLM_MODEL } from '../../lib/constants'
 import { formatHotkey } from '../../lib/utils'
 import { Toggle } from '../shared/Toggle'
 import { Select } from '../shared/Select'
@@ -537,6 +537,24 @@ export function SettingsPage() {
           </Row>
 
           {store.aiCleanup && (
+            <Row>
+              <div>
+                <div className="text-[13px] font-medium text-[#1a1a1a]">Cleanup Model</div>
+                <div className="text-[11px] text-[#aaa] mt-0.5">
+                  {CLEANUP_MODELS.find(m => m.id === store.cleanupModel)?.description}
+                </div>
+              </div>
+              <div className="w-[180px]">
+                <Select
+                  options={CLEANUP_MODELS.map(m => ({ value: m.id, label: `${m.name} (${m.size})` }))}
+                  value={store.cleanupModel}
+                  onChange={(v) => store.updateSettings({ cleanupModel: String(v) })}
+                />
+              </div>
+            </Row>
+          )}
+
+          {store.aiCleanup && store.cleanupModel === 'qwen' && (
             <Row>
               <div>
                 <div className="text-[13px] font-medium text-[#1a1a1a]">Tone</div>

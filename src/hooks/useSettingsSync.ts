@@ -11,6 +11,7 @@ const SYNCED_KEYS = [
   'autoDismissOverlay', 'smartFormatting',
   'inputDevice', 'model', 'onboardingComplete',
   'aiCleanup',
+  'cleanupModel',
   'beamSearch',
   'toneMode',
   'overlayPosition',

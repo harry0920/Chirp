@@ -14,11 +14,29 @@ export const DEFAULT_SETTINGS = {
   historyRetentionDays: 0,
   helpImprove: false,
   beamSearch: false,
+  cleanupModel: 'chirp-cleanup' as string,
 }
 
 export const TONE_MODES = [
   { id: 'message', label: 'Message', description: 'Natural conversational tone' },
   { id: 'email', label: 'Email', description: 'Professional email formatting' },
+] as const
+
+export const CLEANUP_MODELS = [
+  {
+    id: 'chirp-cleanup',
+    name: 'Chirp Cleanup',
+    size: '78 MB',
+    description: 'Fast and lightweight. Optimized for Chirp.',
+    recommended: true,
+  },
+  {
+    id: 'qwen',
+    name: 'Qwen 2.5 (Legacy)',
+    size: '2.1 GB',
+    description: 'Larger general-purpose model. Slower on laptops.',
+    recommended: false,
+  },
 ] as const
 
 export const STT_MODELS = [

@@ -48,6 +48,7 @@ export interface AppState {
 
   // AI Cleanup
   aiCleanup: boolean
+  cleanupModel: string
   llmReady: boolean
 
   // Beam Search
@@ -150,6 +151,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   // AI Cleanup
   aiCleanup: DEFAULT_SETTINGS.aiCleanup,
+  cleanupModel: DEFAULT_SETTINGS.cleanupModel,
   llmReady: false,
   llmDownloadProgress: null,
 
