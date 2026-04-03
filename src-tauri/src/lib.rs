@@ -7,6 +7,7 @@ mod feedback;
 mod history;
 mod inject;
 mod llm;
+mod t5;
 mod hotkey;
 #[cfg(target_os = "macos")]
 mod native_hotkey;
