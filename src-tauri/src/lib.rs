@@ -217,15 +217,23 @@ pub fn run() {
             // Kill any stale llama-server from a previous crash (C2 fix)
             llm::kill_stale_server();
 
-            // Auto-start LLM server if AI cleanup is enabled and files exist
+            // Auto-start cleanup server if AI cleanup is enabled and files exist
             {
                 let state = handle.state::<SharedState>();
                 let s = state.blocking_lock();
                 let ai_cleanup = s.settings.ai_cleanup;
+                let cleanup_model = s.settings.cleanup_model.clone();
                 drop(s);
 
-                if ai_cleanup && llm::binary_exists() && llm::model_exists() {
+                let should_start = if cleanup_model == "chirp-cleanup" {
+                    ai_cleanup && t5::model_exists()
+                } else {
+                    ai_cleanup && llm::binary_exists() && llm::model_exists()
+                };
+
+                if should_start {
                     let state_clone = handle.state::<SharedState>().inner().clone();
+                    let cleanup_model_clone = cleanup_model.clone();
                     tauri::async_runtime::spawn(async move {
                         let port = match std::net::TcpListener::bind("127.0.0.1:0") {
                             Ok(listener) => match listener.local_addr() {
@@ -241,7 +249,13 @@ pub fn run() {
                             }
                         };
 
-                        match llm::start_server(port).await {
+                        let result = if cleanup_model_clone == "chirp-cleanup" {
+                            t5::start_server(port).await
+                        } else {
+                            llm::start_server(port).await
+                        };
+
+                        match result {
                             Ok(child) => {
                                 let mut s = state_clone.lock().await;
                                 if let Some(pid) = child.id() {
@@ -249,10 +263,10 @@ pub fn run() {
                                 }
                                 s.llm_process = Some(child);
                                 s.llm_port = Some(port);
-                                log::info!("LLM server auto-started on port {port}");
+                                log::info!("{cleanup_model_clone} server auto-started on port {port}");
                             }
                             Err(e) => {
-                                log::warn!("Failed to auto-start LLM server: {e}");
+                                log::warn!("Failed to auto-start {cleanup_model_clone} server: {e}");
                             }
                         }
                     });

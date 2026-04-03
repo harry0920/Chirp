@@ -548,7 +548,27 @@ export function SettingsPage() {
                 <Select
                   options={CLEANUP_MODELS.map(m => ({ value: m.id, label: `${m.name} (${m.size})` }))}
                   value={store.cleanupModel}
-                  onChange={(v) => store.updateSettings({ cleanupModel: String(v) })}
+                  onChange={async (v) => {
+                    const newModel = String(v)
+                    if (newModel === store.cleanupModel) return
+                    // Save setting to backend first, then restart server
+                    await invoke('update_settings', { partial: { cleanupModel: newModel } })
+                    store.updateSettings({ cleanupModel: newModel })
+                    // Restart server with the new backend
+                    if (store.llmReady) {
+                      store.setLlmReady(false)
+                      try { await tauri.stopLlm() } catch { /* ignore */ }
+                      try {
+                        const status = await tauri.getLlmStatus()
+                        if (status.modelDownloaded) {
+                          await tauri.startLlm()
+                          store.setLlmReady(true)
+                        }
+                      } catch (e) {
+                        console.error('Failed to restart cleanup server:', e)
+                      }
+                    }
+                  }}
                 />
               </div>
             </Row>
