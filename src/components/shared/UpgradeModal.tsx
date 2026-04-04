@@ -52,7 +52,7 @@ export function UpgradeModal() {
       onClick={handleSkip}
     >
       <div
-        className="relative bg-white rounded-[20px] shadow-xl max-w-[380px] w-full mx-4 overflow-hidden"
+        className="relative bg-card rounded-[20px] shadow-xl max-w-[380px] w-full mx-4 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Warm gradient header */}
@@ -66,7 +66,7 @@ export function UpgradeModal() {
             </span>
           </div>
 
-          <h2 className="mt-3 font-display font-extrabold text-[24px] text-[#1a1a1a] leading-tight text-center px-8">
+          <h2 className="mt-3 font-display font-extrabold text-[24px] text-dm-primary leading-tight text-center px-8">
             Smart Cleanup
             <br />
             just got smarter
@@ -75,27 +75,27 @@ export function UpgradeModal() {
 
         <div className="px-8 pb-8">
           <div className="flex flex-col items-center text-center">
-            <p className="font-body text-[14px] text-[#777] leading-relaxed">
+            <p className="font-body text-[14px] text-dm-muted leading-relaxed">
               We've upgraded to Google's latest
-              {' '}<span className="font-semibold text-[#1a1a1a]">Gemma 4 E2B</span> model
+              {' '}<span className="font-semibold text-dm-primary">Gemma 4 E2B</span> model
               for better grammar, smarter corrections,
               and dictionary-aware cleanup.
             </p>
 
-            <p className="mt-6 font-body text-[12px] text-[#aaa]">
+            <p className="mt-6 font-body text-[12px] text-dm-secondary">
               One-time download · About 3 GB · 100% on-device
             </p>
 
             {/* Progress bar */}
             {downloading && progress !== null && (
               <div className="mt-5 w-full">
-                <div className="h-1.5 w-full bg-[#F0EFEB] rounded-full overflow-hidden">
+                <div className="h-1.5 w-full bg-surface rounded-full overflow-hidden">
                   <div
                     className="h-full bg-chirp-amber-400 rounded-full transition-all duration-300"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <p className="mt-2 font-mono text-[12px] text-[#888]">
+                <p className="mt-2 font-mono text-[12px] text-dm-muted">
                   {progress}%
                 </p>
               </div>
@@ -124,7 +124,7 @@ export function UpgradeModal() {
               <button
                 onClick={handleSkip}
                 disabled={downloading}
-                className="font-body text-[13px] text-[#aaa] hover:text-[#666] transition-colors disabled:opacity-50"
+                className="font-body text-[13px] text-dm-secondary hover:text-dm-primary transition-colors disabled:opacity-50"
               >
                 Maybe later
               </button>

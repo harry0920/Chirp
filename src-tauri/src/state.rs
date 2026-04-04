@@ -60,6 +60,8 @@ pub struct Settings {
     pub beam_search: bool,
     #[serde(default = "default_cleanup_model")]
     pub cleanup_model: String,
+    #[serde(default)]
+    pub dark_mode: bool,
 }
 
 fn default_cleanup_model() -> String {
@@ -97,6 +99,7 @@ impl Default for Settings {
             help_improve: false,
             beam_search: false,
             cleanup_model: "gemma".into(),
+            dark_mode: false,
         }
     }
 }

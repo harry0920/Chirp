@@ -127,18 +127,13 @@ pub fn cleanup_text(text: &str, smart_formatting: bool) -> String {
         return String::new();
     }
 
-    // Step 1: Remove filler words
-    let cleaned = remove_fillers(text);
-
-    // Step 2: Strip self-corrections — keep only the final intent
-    let cleaned = strip_corrections(&cleaned);
-
     if !smart_formatting {
-        return capitalize_first(&cleaned);
+        return text.to_string();
     }
 
-    // Step 3: Regex-based formatting (spoken punctuation, numbers, etc.)
-    smart_format(&cleaned)
+    // Regex-based formatting (spoken punctuation, numbers, etc.)
+    // Fillers and self-corrections are left for the LLM to handle with full context
+    smart_format(text)
 }
 
 /// Remove common filler words from transcript
@@ -182,7 +177,6 @@ fn capitalize_first(text: &str) -> String {
 
 /// Smart formatting: punctuation, capitalization, numbers, common patterns
 fn smart_format(text: &str) -> String {
-    let re = regexes();
     let mut result = text.to_string();
 
     // Expand spoken numbers to digits for common cases
@@ -190,36 +184,6 @@ fn smart_format(text: &str) -> String {
 
     // Format common spoken patterns
     result = format_spoken_patterns(&result);
-
-    // Capitalize first letter
-    result = capitalize_first(&result);
-
-    // Add period at end if missing punctuation
-    let trimmed = result.trim_end();
-    if !trimmed.is_empty() {
-        let last = trimmed.chars().last().unwrap();
-        if !matches!(last, '.' | '!' | '?' | ':' | ';' | '"' | ')') {
-            result = format!("{trimmed}.");
-        }
-    }
-
-    // Capitalize after sentence-ending punctuation
-    result = re
-        .sentence_end
-        .replace_all(&result, |caps: &regex::Captures| {
-            format!("{} {}", &caps[1], caps[2].to_uppercase())
-        })
-        .to_string();
-
-    // Capitalize "i" as standalone word
-    result = re.standalone_i.replace_all(&result, "I").to_string();
-    // Fix I contractions
-    result = re
-        .i_contraction
-        .replace_all(&result, |caps: &regex::Captures| {
-            format!("I'{}", &caps[1])
-        })
-        .to_string();
 
     result
 }
@@ -291,31 +255,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_remove_fillers() {
-        let input = "um so, uh I want to go to the store";
-        let result = remove_fillers(input);
-        assert!(!result.contains("um"));
-        assert!(!result.contains("uh"));
-        assert!(result.contains("I want to go to the store"));
-    }
-
-    #[test]
-    fn test_capitalize_i() {
-        let result = smart_format("i want to go and i need help");
-        assert!(result.contains("I want"));
-        assert!(result.contains("I need"));
-    }
-
-    #[test]
-    fn test_sentence_ending() {
-        let result = smart_format("hello world");
-        assert!(result.ends_with('.'));
-    }
-
-    #[test]
     fn test_spoken_punctuation() {
         let result = smart_format("hello comma how are you question mark");
-        assert!(result.contains("Hello, how are you?"));
+        assert!(result.contains("hello, how are you?"));
     }
 
     #[test]
@@ -337,47 +279,8 @@ mod tests {
     }
 
     #[test]
-    fn test_correction_wait_i_mean() {
-        let result = strip_corrections("let's meet at 3 pm wait I mean 2 pm");
-        assert_eq!(result, "2 pm");
-    }
-
-    #[test]
-    fn test_correction_oh_wait() {
-        let result = strip_corrections("let's meet at 3 pm oh wait let's meet at 2 pm");
-        assert_eq!(result, "let's meet at 2 pm");
-    }
-
-    #[test]
-    fn test_correction_actually() {
-        let result = strip_corrections("the meeting is Tuesday or actually Wednesday");
-        assert_eq!(result, "Wednesday");
-    }
-
-    #[test]
-    fn test_correction_no_i_mean() {
-        let result = strip_corrections("send it to John no I mean send it to Mike");
-        assert_eq!(result, "send it to Mike");
-    }
-
-    #[test]
-    fn test_correction_scratch_that() {
-        let result = strip_corrections("add the thing scratch that");
-        assert_eq!(result, "");
-    }
-
-    #[test]
-    fn test_no_correction() {
-        let result = strip_corrections("hello world this is normal text");
-        assert_eq!(result, "hello world this is normal text");
-    }
-
-    #[test]
     fn test_full_cleanup() {
-        let result = cleanup_text("um i want to uh send an email to bob at test dot com", true);
-        assert!(result.starts_with("I"));
+        let result = cleanup_text("send an email to bob at test dot com", true);
         assert!(result.contains("bob@test.com"));
-        assert!(!result.contains("um"));
-        assert!(!result.contains("uh"));
     }
 }

@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = {
   helpImprove: false,
   beamSearch: false,
   cleanupModel: 'gemma' as string,
+  darkMode: false,
 }
 
 export const TONE_MODES = [

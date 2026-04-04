@@ -13,7 +13,7 @@ use std::io::Cursor;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 const CHIRP_SOUND: &[u8] = include_bytes!("../sounds/chirp.wav");
@@ -42,6 +42,21 @@ pub struct RecordingStartTime(pub std::sync::Mutex<Option<Instant>>);
 /// Holds the active flag for the current audio stream so we can deactivate zombie callbacks.
 pub struct StreamActiveState(pub std::sync::Mutex<Option<audio::StreamActiveFlag>>);
 
+
+#[tauri::command]
+pub fn show_settings(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.unminimize();
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, SharedState>) -> Result<Settings, String> {

@@ -38,6 +38,20 @@
         "visible": false,
         "center": true,
         "maximized": false
+      },
+      {
+        "label": "tray-popup",
+        "title": "Chirp",
+        "width": 320,
+        "height": 440,
+        "resizable": false,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": true,
+        "visible": false,
+        "skipTaskbar": true,
+        "shadow": true,
+        "focus": true
       }
     ],
     "macOSPrivateApi": true,

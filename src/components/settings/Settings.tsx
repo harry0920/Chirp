@@ -42,6 +42,7 @@ export function Settings() {
   const setAboutModalOpen = useAppStore((s) => s.setAboutModalOpen)
   const setUpgradeModalOpen = useAppStore((s) => s.setUpgradeModalOpen)
   const setUpdateAvailable = useAppStore((s) => s.setUpdateAvailable)
+  const darkMode = useAppStore((s) => s.darkMode)
   const tauri = useTauri()
   const [appVersion, setAppVersion] = useState('...')
 
@@ -84,7 +85,7 @@ export function Settings() {
   const PageComponent = PAGES[settingsPage] ?? HomePage
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden no-select">
+    <div className={`flex flex-col h-screen overflow-hidden no-select transition-colors duration-200 ${darkMode ? 'dark' : ''}`}>
       {/* Custom titlebar — macOS: drag-only region; Windows: logo + window controls */}
       <div data-tauri-drag-region className={`flex items-center justify-between shrink-0 bg-sidebar w-full ${IS_MAC ? 'h-[34px]' : 'h-10'}`} style={IS_MAC ? { WebkitAppRegion: 'drag' } as React.CSSProperties : undefined}>
         {!IS_MAC && (
@@ -216,7 +217,7 @@ export function Settings() {
 
       {/* Saved indicator */}
       {settingsSaved && (
-        <div className="fixed bottom-5 right-5 flex items-center gap-[6px] px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-xs font-medium shadow-elevated animate-saved-pop z-50">
+        <div className="fixed bottom-5 right-5 flex items-center gap-[6px] px-4 py-2 bg-dm-btn-bg text-dm-btn-text rounded-lg text-xs font-medium shadow-elevated animate-saved-pop z-50">
           <Check size={14} className="text-chirp-success" /> Saved
         </div>
       )}

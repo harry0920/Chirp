@@ -1,6 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from './stores/appStore'
 import { Overlay } from './components/overlay/Overlay'
+import { TrayPopup } from './components/tray-popup/TrayPopup'
 import { Settings } from './components/settings/Settings'
 import { Onboarding } from './components/onboarding/Onboarding'
 import { useSettingsSync } from './hooks/useSettingsSync'
@@ -43,6 +44,15 @@ export function App() {
     return (
       <ErrorBoundary fallback="overlay">
         <Overlay />
+      </ErrorBoundary>
+    )
+  }
+
+  // Tray popup window
+  if (windowLabel === 'tray-popup') {
+    return (
+      <ErrorBoundary fallback="tray-popup">
+        <TrayPopup />
       </ErrorBoundary>
     )
   }

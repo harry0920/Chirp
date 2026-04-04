@@ -77,6 +77,9 @@ export interface AppState {
   // History retention
   historyRetentionDays: number
 
+  // Appearance
+  darkMode: boolean
+
   // Telemetry
   helpImprove: boolean
 
@@ -183,6 +186,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   // History retention
   historyRetentionDays: DEFAULT_SETTINGS.historyRetentionDays,
+
+  // Appearance
+  darkMode: DEFAULT_SETTINGS.darkMode,
 
   // Telemetry
   helpImprove: DEFAULT_SETTINGS.helpImprove,

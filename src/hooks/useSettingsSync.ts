@@ -18,6 +18,7 @@ const SYNCED_KEYS = [
   'showPassiveOverlay',
   'historyRetentionDays',
   'helpImprove',
+  'darkMode',
 ] as const
 
 /**

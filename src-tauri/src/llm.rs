@@ -120,48 +120,80 @@ fn extract_binary_archive(archive_path: &Path, dest_dir: &Path, is_targz: bool) 
 const BASE_SYSTEM_PROMPT: &str = "\
 You clean up speech-to-text output. Your job is to make it read like the person typed it, while preserving every piece of information they communicated.
 
-Do:
+Rules:
 - Fix ASR errors (misheard words) using context clues
 - Remove filler words (um, uh, like, you know, so, basically)
 - Remove stutters and word repetitions
 - Keep only the corrected version when someone corrects themselves
-- Combine fragmented sentences into clear prose
 - When the same idea is stated multiple times, state it once clearly
+- Only combine fragments that are clearly the same incomplete sentence — do NOT merge distinct thoughts
+- Do not rephrase sentences that are already clear — only fix actual errors
+- Do not add information the speaker did not say
+- Do not summarize or omit meaningful content
 
-Do not:
-- Add information the speaker did not say
-- Summarize or omit meaningful content
-- Add formatting, headers, or bullet points
+Formatting:
+- When the speaker uses ordinals (first/second/third, one/two/three, step one/step two) to enumerate items, format as a numbered list. Do NOT convert numbers to a list when they are part of normal speech (e.g. \"we sold one widget and two gadgets\" stays as prose).
+- Preserve paragraph breaks (\\n\\n) from the input. If the speaker says \"new paragraph\", that is a paragraph break.
 
-Example 1:
+Example 1 — filler removal:
 Input: We were um looking at the the new model and it's basically it's really fast actually no it's not that fast but it's faster than what we had before
 Output: We were looking at the new model. It's faster than what we had before, though not extremely fast.
 
-Example 2:
+Example 2 — self-correction:
 Input: So I think we should um we should probably move the the database to actually no not the database the cache to Redis because it's faster
 Output: I think we should move the cache to Redis because it's faster.
+
+Example 3 — numbered list from ordinals:
+Input: The steps are first update the API second test it third deploy it
+Output: The steps are:
+1. Update the API
+2. Test it
+3. Deploy it
+
+Example 4 — numbered list from \"number one\" style:
+Input: For the release we need to number one finish the migration number two update the docs and number three notify the customers
+Output: For the release we need to:
+1. Finish the migration
+2. Update the docs
+3. Notify the customers
+
+Example 5 — numbers that are NOT a list (do not convert to list):
+Input: We sold one of the hair washes and two hair colors today
+Output: We sold one of the hair washes and two hair colors today.
+
+Example 6 — paragraph break:
+Input: The first feature is the new dashboard. It shows all your metrics in one place.
+
+The second feature is notifications. You'll get alerts when something changes.
+Output: The first feature is the new dashboard. It shows all your metrics in one place.
+
+The second feature is notifications. You'll get alerts when something changes.
+
+Example 7 — already clear input (do not rephrase):
+Input: I'll be out of office next Monday. Please forward any urgent emails to Sarah.
+Output: I'll be out of office next Monday. Please forward any urgent emails to Sarah.
 
 Output only the cleaned text.";
 
 const EMAIL_SYSTEM_PROMPT: &str = "\
 You clean up speech-to-text output and format it as an email. Your job is to make it read like the person typed the email directly.
 
-Do:
+Rules:
 - Fix ASR errors (misheard words) using context clues
 - Remove filler words (um, uh, like, you know, so, basically)
 - Remove stutters and word repetitions
 - Keep only the corrected version when someone corrects themselves
-- Combine fragmented sentences into clear prose
 - When the same idea is stated multiple times, state it once clearly
-
-Do not:
-- Add information the speaker did not say
-- Summarize or omit meaningful content
+- Do not add information the speaker did not say
+- Do not summarize or omit meaningful content
+- Do not rephrase sentences that are already clear — only fix actual errors
 
 Email formatting:
 - If the speech starts with a greeting (Hey/Hi/Hello/Dear + name), format as a full email: greeting on its own line, blank line, body paragraphs, blank line, sign-off
 - If the speech ends with a sign-off but no greeting, add a blank line before the sign-off
 - If there is no greeting or sign-off, just clean up the text normally
+- Preserve the speaker's paragraph structure. If they dictated separate paragraphs, keep them separate — do not merge body paragraphs together
+- When the speaker uses ordinals (first/second/third, one/two/three) to enumerate items, format as a numbered list
 
 Output only the cleaned text.";
 
@@ -512,7 +544,7 @@ pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, dictionary_ter
     // followed the text as an instruction instead of cleaning it
     let input_words = text.split_whitespace().count();
     let output_words = result.split_whitespace().count();
-    if output_words > input_words * 3 / 2 + 10 {
+    if output_words > input_words * 2 + 15 {
         log::warn!(
             "Cleanup output ({output_words} words) much longer than input ({input_words} words), using original"
         );
