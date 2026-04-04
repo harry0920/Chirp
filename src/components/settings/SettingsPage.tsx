@@ -6,7 +6,7 @@ import { useHotkeyRecorder } from '../../hooks/useHotkeyRecorder'
 import type { AudioDevice } from '../../hooks/useTauri'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
 import { useLlmDownloaded } from '../../hooks/useLlmDownloaded'
-import { TONE_MODES, CLEANUP_MODELS, STT_MODELS, LLM_MODEL } from '../../lib/constants'
+import { TONE_MODES, STT_MODELS, LLM_MODEL } from '../../lib/constants'
 import { formatHotkey } from '../../lib/utils'
 import { Toggle } from '../shared/Toggle'
 import { Select } from '../shared/Select'
@@ -537,44 +537,6 @@ export function SettingsPage() {
           </Row>
 
           {store.aiCleanup && (
-            <Row>
-              <div>
-                <div className="text-[13px] font-medium text-[#1a1a1a]">Cleanup Model</div>
-                <div className="text-[11px] text-[#aaa] mt-0.5">
-                  {CLEANUP_MODELS.find(m => m.id === store.cleanupModel)?.description}
-                </div>
-              </div>
-              <div className="w-[180px]">
-                <Select
-                  options={CLEANUP_MODELS.map(m => ({ value: m.id, label: `${m.name} (${m.size})` }))}
-                  value={store.cleanupModel}
-                  onChange={async (v) => {
-                    const newModel = String(v)
-                    if (newModel === store.cleanupModel) return
-                    // Save setting to backend first, then restart server
-                    await invoke('update_settings', { partial: { cleanupModel: newModel } })
-                    store.updateSettings({ cleanupModel: newModel })
-                    // Restart server with the new backend
-                    if (store.llmReady) {
-                      store.setLlmReady(false)
-                      try { await tauri.stopLlm() } catch { /* ignore */ }
-                      try {
-                        const status = await tauri.getLlmStatus()
-                        if (status.modelDownloaded) {
-                          await tauri.startLlm()
-                          store.setLlmReady(true)
-                        }
-                      } catch (e) {
-                        console.error('Failed to restart cleanup server:', e)
-                      }
-                    }
-                  }}
-                />
-              </div>
-            </Row>
-          )}
-
-          {store.aiCleanup && store.cleanupModel === 'qwen' && (
             <Row>
               <div>
                 <div className="text-[13px] font-medium text-[#1a1a1a]">Tone</div>

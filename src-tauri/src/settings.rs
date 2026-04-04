@@ -73,6 +73,26 @@ fn dictionary_path() -> PathBuf {
     config_dir().join("dictionary.json")
 }
 
+/// Remove old model files from previous versions (Qwen GGUF, chirp-cleanup T5)
+fn cleanup_old_models() {
+    let llm_dir = config_dir().join("llm");
+    let qwen_path = llm_dir.join("qwen2.5-3b-instruct-q4_k_m.gguf");
+    if qwen_path.exists() {
+        match std::fs::remove_file(&qwen_path) {
+            Ok(_) => log::info!("Cleaned up old Qwen model ({})", qwen_path.display()),
+            Err(e) => log::warn!("Failed to remove old Qwen model: {e}"),
+        }
+    }
+
+    let chirp_cleanup_dir = config_dir().join("chirp-cleanup");
+    if chirp_cleanup_dir.exists() {
+        match std::fs::remove_dir_all(&chirp_cleanup_dir) {
+            Ok(_) => log::info!("Cleaned up old chirp-cleanup model dir"),
+            Err(e) => log::warn!("Failed to remove chirp-cleanup dir: {e}"),
+        }
+    }
+}
+
 /// Load settings from disk, returning defaults if file doesn't exist
 pub fn load_settings() -> Settings {
     let path = settings_path();
@@ -91,6 +111,15 @@ pub fn load_settings() -> Settings {
         }
         _ => {}
     }
+
+    // Migrate old cleanup model to Gemma
+    if settings.cleanup_model != "gemma" {
+        log::info!("Migrated cleanup_model '{}' → 'gemma'", settings.cleanup_model);
+        settings.cleanup_model = "gemma".into();
+    }
+
+    // Clean up old model files (Qwen, chirp-cleanup) in background
+    cleanup_old_models();
 
     // Migrate old Tauri shortcut format to new event.code-based format
     let migrated = migrate_hotkey(&settings.hotkey);

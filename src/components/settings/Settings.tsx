@@ -7,9 +7,11 @@ import { open } from '@tauri-apps/plugin-shell'
 import { Home, BookOpen, Zap, Settings as SettingsIcon, Check, Minus, Square, X, Heart } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
+import { useTauri } from '../../hooks/useTauri'
 import { BirdMark } from '../shared/BirdMark'
 import { KeyBadge } from '../shared/KeyBadge'
 import { AboutModal } from '../shared/AboutModal'
+import { UpgradeModal } from '../shared/UpgradeModal'
 import { formatHotkey } from '../../lib/utils'
 import { HomePage } from './HomePage'
 import { DictionaryPage } from './DictionaryPage'
@@ -38,10 +40,23 @@ export function Settings() {
   const hotkey = useAppStore((s) => s.hotkey)
   const aboutModalOpen = useAppStore((s) => s.aboutModalOpen)
   const setAboutModalOpen = useAppStore((s) => s.setAboutModalOpen)
+  const setUpgradeModalOpen = useAppStore((s) => s.setUpgradeModalOpen)
   const setUpdateAvailable = useAppStore((s) => s.setUpdateAvailable)
+  const tauri = useTauri()
   const [appVersion, setAppVersion] = useState('...')
 
   useEffect(() => { getVersion().then(setAppVersion) }, [])
+
+  // Auto-show upgrade modal for existing users who had cleanup enabled but need the new model
+  useEffect(() => {
+    const aiCleanup = useAppStore.getState().aiCleanup
+    if (!aiCleanup) return
+    tauri.getLlmStatus().then((status) => {
+      if (!status.modelDownloaded) {
+        setUpgradeModalOpen(true)
+      }
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-check for updates on launch (silently, no UI blocking)
   useEffect(() => {
@@ -208,6 +223,9 @@ export function Settings() {
 
       {/* About modal */}
       {aboutModalOpen && <AboutModal />}
+
+      {/* Upgrade modal — shown when Smart Cleanup needs new model */}
+      <UpgradeModal />
     </div>
   )
 }

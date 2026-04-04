@@ -63,7 +63,7 @@ pub struct Settings {
 }
 
 fn default_cleanup_model() -> String {
-    "qwen".into()
+    "gemma".into()
 }
 
 fn default_overlay_position() -> String {
@@ -96,7 +96,7 @@ impl Default for Settings {
             history_retention_days: 0,
             help_improve: false,
             beam_search: false,
-            cleanup_model: "qwen".into(),
+            cleanup_model: "gemma".into(),
         }
     }
 }
@@ -176,6 +176,8 @@ pub struct AppState {
     pub recognizer: Option<Arc<SherpaRecognizer>>,
     pub llm_process: Option<tokio::process::Child>,
     pub llm_port: Option<u16>,
+    /// Shared HTTP client for LLM/T5 requests (connection pooling)
+    pub http_client: reqwest::Client,
 }
 
 impl AppState {
@@ -191,6 +193,11 @@ impl AppState {
             recognizer: None,
             llm_process: None,
             llm_port: None,
+            http_client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .pool_max_idle_per_host(1)
+                .build()
+                .expect("Failed to create HTTP client"),
         }
     }
 }

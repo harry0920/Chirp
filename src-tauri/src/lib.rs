@@ -7,7 +7,6 @@ mod feedback;
 mod history;
 mod inject;
 mod llm;
-mod t5;
 mod hotkey;
 #[cfg(target_os = "macos")]
 mod native_hotkey;
@@ -222,18 +221,12 @@ pub fn run() {
                 let state = handle.state::<SharedState>();
                 let s = state.blocking_lock();
                 let ai_cleanup = s.settings.ai_cleanup;
-                let cleanup_model = s.settings.cleanup_model.clone();
                 drop(s);
 
-                let should_start = if cleanup_model == "chirp-cleanup" {
-                    ai_cleanup && t5::model_exists()
-                } else {
-                    ai_cleanup && llm::binary_exists() && llm::model_exists()
-                };
+                let should_start = ai_cleanup && llm::binary_exists() && llm::model_exists();
 
                 if should_start {
                     let state_clone = handle.state::<SharedState>().inner().clone();
-                    let cleanup_model_clone = cleanup_model.clone();
                     tauri::async_runtime::spawn(async move {
                         let port = match std::net::TcpListener::bind("127.0.0.1:0") {
                             Ok(listener) => match listener.local_addr() {
@@ -249,11 +242,7 @@ pub fn run() {
                             }
                         };
 
-                        let result = if cleanup_model_clone == "chirp-cleanup" {
-                            t5::start_server(port).await
-                        } else {
-                            llm::start_server(port).await
-                        };
+                        let result = llm::start_server(port).await;
 
                         match result {
                             Ok(child) => {
@@ -263,10 +252,10 @@ pub fn run() {
                                 }
                                 s.llm_process = Some(child);
                                 s.llm_port = Some(port);
-                                log::info!("{cleanup_model_clone} server auto-started on port {port}");
+                                log::info!("Gemma server auto-started on port {port}");
                             }
                             Err(e) => {
-                                log::warn!("Failed to auto-start {cleanup_model_clone} server: {e}");
+                                log::warn!("Failed to auto-start Gemma server: {e}");
                             }
                         }
                     });

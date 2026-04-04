@@ -89,6 +89,9 @@ export interface AppState {
   // About modal
   aboutModalOpen: boolean
 
+  // Upgrade modal (shown when user needs new Gemma model)
+  upgradeModalOpen: boolean
+
   // Update availability
   updateAvailable: string | null  // version string, or null
 
@@ -123,6 +126,7 @@ export interface AppState {
   setOnboardingComplete: (complete: boolean) => void
   setSettingsSaved: (saved: boolean) => void
   setAboutModalOpen: (open: boolean) => void
+  setUpgradeModalOpen: (open: boolean) => void
   setUpdateAvailable: (version: string | null) => void
 }
 
@@ -191,6 +195,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   // About modal
   aboutModalOpen: false,
+  upgradeModalOpen: false,
 
   // Update availability
   updateAvailable: null,
@@ -234,5 +239,6 @@ export const useAppStore = create<AppState>((set) => ({
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
   setSettingsSaved: (settingsSaved) => set({ settingsSaved }),
   setAboutModalOpen: (aboutModalOpen) => set({ aboutModalOpen }),
+  setUpgradeModalOpen: (upgradeModalOpen) => set({ upgradeModalOpen }),
   setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
 }))

@@ -226,17 +226,12 @@ pub async fn stop_server(child: &mut tokio::process::Child) {
 }
 
 /// Send text through chirp-cleanup for AI cleanup
-pub async fn cleanup_text(port: u16, text: &str) -> Result<String, String> {
+pub async fn cleanup_text(port: u16, text: &str, client: &reqwest::Client) -> Result<String, String> {
     let payload = serde_json::json!({
         "text": text,
         "beam_size": 4,
         "max_length": 256,
     });
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| format!("HTTP client error: {e}"))?;
 
     let resp = client
         .post(format!("http://127.0.0.1:{port}/v1/completions"))

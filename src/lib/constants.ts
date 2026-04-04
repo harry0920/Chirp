@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS = {
   historyRetentionDays: 0,
   helpImprove: false,
   beamSearch: false,
-  cleanupModel: 'chirp-cleanup' as string,
+  cleanupModel: 'gemma' as string,
 }
 
 export const TONE_MODES = [
@@ -22,34 +22,17 @@ export const TONE_MODES = [
   { id: 'email', label: 'Email', description: 'Professional email formatting' },
 ] as const
 
-export const CLEANUP_MODELS = [
-  {
-    id: 'chirp-cleanup',
-    name: 'Chirp Cleanup',
-    size: '78 MB',
-    description: 'Fast and lightweight. Optimized for Chirp.',
-    recommended: true,
-  },
-  {
-    id: 'qwen',
-    name: 'Qwen 2.5 (Legacy)',
-    size: '2.1 GB',
-    description: 'Larger general-purpose model. Slower on laptops.',
-    recommended: false,
-  },
-] as const
-
 export const STT_MODELS = [
   { id: 'parakeet-tdt-0.6b' as const, name: 'Parakeet TDT — NVIDIA', size: '465 MB', description: 'Best accuracy · 25 languages · fast on any PC', recommended: true },
 ]
 
 export const LLM_MODEL = {
-  name: 'Qwen 2.5 — Alibaba',
+  name: 'Gemma 4 E2B — Google',
   displayName: 'Smart Cleanup',
-  size: '2.1 GB',
-  friendlySize: 'About 2 GB',
-  description: 'Multilingual grammar correction (29 languages).',
-  attribution: 'Powered by Qwen 2.5 — Alibaba',
+  size: '3.1 GB',
+  friendlySize: 'About 3 GB',
+  description: 'High-quality grammar and speech cleanup.',
+  attribution: 'Powered by Gemma 4 — Google',
 }
 
 export const CLEANUP_EXAMPLE = {
