@@ -71,8 +71,9 @@ export interface AppState {
   toneMode: string
 
   // Overlay
-  overlayPosition: 'bottom' | 'top'
+  overlayPosition: string | { x: number; y: number }
   showPassiveOverlay: boolean
+  repositionMode: boolean
 
   // History retention
   historyRetentionDays: number
@@ -131,6 +132,7 @@ export interface AppState {
   setAboutModalOpen: (open: boolean) => void
   setUpgradeModalOpen: (open: boolean) => void
   setUpdateAvailable: (version: string | null) => void
+  setRepositionMode: (mode: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -183,6 +185,7 @@ export const useAppStore = create<AppState>((set) => ({
   // Overlay
   overlayPosition: DEFAULT_SETTINGS.overlayPosition,
   showPassiveOverlay: DEFAULT_SETTINGS.showPassiveOverlay,
+  repositionMode: false,
 
   // History retention
   historyRetentionDays: DEFAULT_SETTINGS.historyRetentionDays,
@@ -247,4 +250,5 @@ export const useAppStore = create<AppState>((set) => ({
   setAboutModalOpen: (aboutModalOpen) => set({ aboutModalOpen }),
   setUpgradeModalOpen: (upgradeModalOpen) => set({ upgradeModalOpen }),
   setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
+  setRepositionMode: (repositionMode) => set({ repositionMode }),
 }))

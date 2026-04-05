@@ -5,8 +5,11 @@ mod commands;
 mod dictionary;
 mod feedback;
 mod history;
+#[cfg(windows)]
+mod clipboard_win;
 mod inject;
 mod llm;
+mod richtext;
 mod hotkey;
 #[cfg(target_os = "macos")]
 mod native_hotkey;

@@ -38,7 +38,6 @@ dirs = "5"
 regex = "1"
 tar = "0.4"
 bzip2 = "0.5"
-arboard = "3.6.1"
 chrono = { version = "0.4", features = ["serde"] }
 zip = "2"
 flate2 = "1"
@@ -54,6 +53,14 @@ semver = "1"
 cocoa = "0.26"
 core-graphics = "0.24"
 objc = "0.2"
+arboard = "3.6.1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_System_DataExchange",
+    "Win32_Foundation",
+    "Win32_System_Memory",
+] }
 
 [profile.release]
 opt-level = 3

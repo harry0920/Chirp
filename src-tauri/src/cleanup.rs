@@ -85,8 +85,7 @@ fn regexes() -> &'static CleanupRegexes {
             (r"(?i)\bhyphen\b", "-"),
             (r"(?i)\bopen (?:paren|parenthesis)\b", "("),
             (r"(?i)\bclose (?:paren|parenthesis)\b", ")"),
-            (r"(?i)\bnew line\b", "\n"),
-            (r"(?i)\bnew paragraph\b", "\n\n"),
+            // "new line" and "new paragraph" handled by LLM, not regex
         ]
         .iter()
         .filter_map(|(p, r)| Regex::new(p).ok().map(|re| (re, *r)))
@@ -273,9 +272,10 @@ mod tests {
     }
 
     #[test]
-    fn test_new_paragraph() {
+    fn test_new_paragraph_passthrough() {
+        // "new paragraph" should pass through to LLM as words, not be converted by regex
         let result = smart_format("hello new paragraph world");
-        assert!(result.contains("\n\n"));
+        assert!(result.contains("new paragraph"));
     }
 
     #[test]

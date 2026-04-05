@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { emit } from '@tauri-apps/api/event'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import { useHotkeyRecorder } from '../../hooks/useHotkeyRecorder'
@@ -10,7 +11,6 @@ import { TONE_MODES, STT_MODELS, LLM_MODEL } from '../../lib/constants'
 import { formatHotkey } from '../../lib/utils'
 import { Toggle } from '../shared/Toggle'
 import { Select } from '../shared/Select'
-import { SegmentedControl } from '../shared/SegmentedControl'
 import { KeyBadge } from '../shared/KeyBadge'
 import { Button } from '../shared/Button'
 
@@ -112,6 +112,16 @@ function FeedbackSection() {
       </div>
     </div>
   )
+}
+
+function describePosition(pos: unknown): string {
+  if (typeof pos === 'string') {
+    return pos === 'top' ? 'top center' : 'bottom center'
+  }
+  if (pos && typeof pos === 'object' && 'x' in pos && 'y' in pos) {
+    return 'custom position'
+  }
+  return 'bottom center'
 }
 
 export function SettingsPage() {
@@ -614,16 +624,16 @@ export function SettingsPage() {
           <Row>
             <div>
               <div className="text-[13px] font-medium text-dm-primary">Overlay position</div>
-              <div className="text-[11px] text-dm-secondary mt-0.5">Where the recording pill appears</div>
+              <div className="text-[11px] text-dm-secondary mt-0.5">
+                Currently: {describePosition(store.overlayPosition)}
+              </div>
             </div>
-            <SegmentedControl
-              options={[
-                { value: 'bottom', label: 'Bottom' },
-                { value: 'top', label: 'Top' },
-              ]}
-              value={store.overlayPosition}
-              onChange={(v) => store.updateSettings({ overlayPosition: v as 'bottom' | 'top' })}
-            />
+            <Button
+              onClick={() => emit('enter-reposition-mode')}
+              variant="secondary"
+            >
+              Reposition
+            </Button>
           </Row>
           <Row>
             <div>

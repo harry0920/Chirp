@@ -118,82 +118,60 @@ fn extract_binary_archive(archive_path: &Path, dest_dir: &Path, is_targz: bool) 
 }
 
 const BASE_SYSTEM_PROMPT: &str = "\
-You clean up speech-to-text output. Your job is to make it read like the person typed it, while preserving every piece of information they communicated.
+You clean up speech-to-text output. Make it read like the person typed it themselves. Preserve their voice and tone.
 
-Rules:
-- Fix ASR errors (misheard words) using context clues
-- Remove filler words (um, uh, like, you know, so, basically)
-- Remove stutters and word repetitions
-- Keep only the corrected version when someone corrects themselves
-- When the same idea is stated multiple times, state it once clearly
-- Only combine fragments that are clearly the same incomplete sentence — do NOT merge distinct thoughts
-- Do not rephrase sentences that are already clear — only fix actual errors
-- Do not add information the speaker did not say
-- Do not summarize or omit meaningful content
+Remove:
+- Filler sounds: um, uh, uh huh, hmm, mmhmm
+- Filler \"like\" (but keep meaningful \"like\" as in \"I like pizza\" or \"something like that\")
+- Stutters and repeated words
 
-Formatting:
-- When the speaker uses ordinals (first/second/third, one/two/three, step one/step two) to enumerate items, format as a numbered list. Do NOT convert numbers to a list when they are part of normal speech (e.g. \"we sold one widget and two gadgets\" stays as prose).
-- Preserve paragraph breaks (\\n\\n) from the input. If the speaker says \"new paragraph\", that is a paragraph break.
+Keep exactly as spoken:
+- Words like alright, yeah, so, also, I mean, basically, honestly
+- Profanity
+- The beginning of sentences -- never drop opening words
+- The speaker's exact phrasing -- do not rephrase or restructure
 
-Example 1 — filler removal:
-Input: We were um looking at the the new model and it's basically it's really fast actually no it's not that fast but it's faster than what we had before
-Output: We were looking at the new model. It's faster than what we had before, though not extremely fast.
+Self-corrections: when someone says \"X actually no Y\" or \"X wait Y\" or \"X no I mean Y\", they are correcting X to Y. Remove X entirely and keep Y.
 
-Example 2 — self-correction:
-Input: So I think we should um we should probably move the the database to actually no not the database the cache to Redis because it's faster
-Output: I think we should move the cache to Redis because it's faster.
+Format:
+- Ordinal lists (first/second/third, number one/two/three) -> numbered list
+- \"New paragraph\" or \"new line\" -> actual line break
 
-Example 3 — numbered list from ordinals:
-Input: The steps are first update the API second test it third deploy it
-Output: The steps are:
-1. Update the API
-2. Test it
-3. Deploy it
+Examples:
+Input: So I think we should launch on Tuesday actually no Wednesday because um the design team needs one more day to finish the icons
+Output: So I think we should launch on Wednesday because the design team needs one more day to finish the icons.
 
-Example 4 — numbered list from \"number one\" style:
+Input: Send it to John no I mean send it to Mike
+Output: Send it to Mike.
+
 Input: For the release we need to number one finish the migration number two update the docs and number three notify the customers
 Output: For the release we need to:
 1. Finish the migration
 2. Update the docs
 3. Notify the customers
 
-Example 5 — numbers that are NOT a list (do not convert to list):
-Input: We sold one of the hair washes and two hair colors today
-Output: We sold one of the hair washes and two hair colors today.
-
-Example 6 — paragraph break:
-Input: The first feature is the new dashboard. It shows all your metrics in one place.
-
-The second feature is notifications. You'll get alerts when something changes.
-Output: The first feature is the new dashboard. It shows all your metrics in one place.
-
-The second feature is notifications. You'll get alerts when something changes.
-
-Example 7 — already clear input (do not rephrase):
-Input: I'll be out of office next Monday. Please forward any urgent emails to Sarah.
-Output: I'll be out of office next Monday. Please forward any urgent emails to Sarah.
-
 Output only the cleaned text.";
 
 const EMAIL_SYSTEM_PROMPT: &str = "\
-You clean up speech-to-text output and format it as an email. Your job is to make it read like the person typed the email directly.
+You clean up speech-to-text output and format it as an email. Make it read like the person typed the email directly.
 
-Rules:
-- Fix ASR errors (misheard words) using context clues
-- Remove filler words (um, uh, like, you know, so, basically)
-- Remove stutters and word repetitions
-- Keep only the corrected version when someone corrects themselves
-- When the same idea is stated multiple times, state it once clearly
-- Do not add information the speaker did not say
-- Do not summarize or omit meaningful content
-- Do not rephrase sentences that are already clear — only fix actual errors
+Remove:
+- Filler sounds: um, uh, uh huh, hmm, mmhmm
+- Filler \"like\" (keep meaningful uses)
+- Stutters and repeated words
+
+Keep exactly as spoken:
+- The speaker's exact phrasing -- do not rephrase or restructure
+- Do not drop opening words or censor profanity
+
+Self-corrections: when someone says \"X actually no Y\" or \"X no I mean Y\", keep only Y.
 
 Email formatting:
 - If the speech starts with a greeting (Hey/Hi/Hello/Dear + name), format as a full email: greeting on its own line, blank line, body paragraphs, blank line, sign-off
 - If the speech ends with a sign-off but no greeting, add a blank line before the sign-off
 - If there is no greeting or sign-off, just clean up the text normally
-- Preserve the speaker's paragraph structure. If they dictated separate paragraphs, keep them separate — do not merge body paragraphs together
-- When the speaker uses ordinals (first/second/third, one/two/three) to enumerate items, format as a numbered list
+- Preserve paragraph structure -- do not merge body paragraphs together
+- \"New paragraph\" or \"new line\" -> actual line break
 
 Output only the cleaned text.";
 
@@ -478,6 +456,31 @@ pub async fn stop_server(child: &mut tokio::process::Child) {
     log::info!("llama-server stopped");
 }
 
+/// Get exact token count for text from llama-server's tokenize endpoint.
+async fn tokenize_text(port: u16, text: &str, client: &reqwest::Client) -> Result<usize, String> {
+    let payload = serde_json::json!({ "content": text });
+    let resp = client
+        .post(format!("http://127.0.0.1:{port}/tokenize"))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Tokenize request failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Tokenize returned status: {}", resp.status()));
+    }
+
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse tokenize response: {e}"))?;
+
+    body["tokens"]
+        .as_array()
+        .map(|arr| arr.len())
+        .ok_or_else(|| "No tokens array in response".to_string())
+}
+
 /// Send text through the LLM for cleanup.
 /// `dictionary_terms` provides known vocabulary so the LLM can correct ASR mishearings.
 pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, dictionary_terms: &[String], client: &reqwest::Client) -> Result<String, String> {
@@ -494,9 +497,21 @@ pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, dictionary_ter
         ));
     }
 
-    let word_count = text.split_whitespace().count();
-    // With regex pre-pass, output should be close to input length or shorter
-    let max_tokens = ((word_count as f64 * 1.5) as usize).clamp(64, 512);
+    // Tokenize the input to get exact token count, then set max_tokens dynamically.
+    // Cleanup output should be similar length or shorter, so input tokens + 20% margin is safe.
+    let max_tokens = match tokenize_text(port, text, client).await {
+        Ok(count) => {
+            let dynamic = ((count as f64 * 1.2).ceil() as usize).max(64);
+            log::info!("Dynamic max_tokens: {count} input tokens → {dynamic} max output");
+            dynamic
+        }
+        Err(e) => {
+            // Fallback: estimate from word count if tokenize endpoint fails
+            log::warn!("Tokenize failed ({e}), estimating from word count");
+            let word_count = text.split_whitespace().count();
+            ((word_count as f64 * 2.0) as usize).max(64)
+        }
+    };
 
     let payload = serde_json::json!({
         "model": "gemma",

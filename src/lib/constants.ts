@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS = {
   model: 'parakeet-tdt-0.6b' as const,
   onboardingComplete: false,
   aiCleanup: true,
-  overlayPosition: 'bottom' as 'bottom' | 'top',
+  overlayPosition: 'default' as string | { x: number; y: number },
   showPassiveOverlay: true,
   toneMode: 'message',
   historyRetentionDays: 0,
