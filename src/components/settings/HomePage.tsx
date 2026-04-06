@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { trackEvent } from '@aptabase/tauri'
-import { Search, Download, Trash2, Copy, BookOpen, Zap, ChevronDown, Clock, Mic, Type, Hash, AlertTriangle, Check } from 'lucide-react'
+import { Search, Download, Trash2, Copy, BookText, Zap, ChevronDown, Clock, Mic, Type, Hash, AlertTriangle, Check } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
@@ -32,9 +32,8 @@ export function HomePage() {
   const [copiedTimestamp, setCopiedTimestamp] = useState<string | null>(null)
   const [expandedTimestamp, setExpandedTimestamp] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [quickAddTab, setQuickAddTab] = useState<'dictionary' | 'snippets'>('dictionary')
-  const [qaFrom, setQaFrom] = useState('')
-  const [qaTo, setQaTo] = useState('')
+  const [quickAddTab, setQuickAddTab] = useState<'vocabulary' | 'snippets'>('vocabulary')
+  const [qaWord, setQaWord] = useState('')
   const [qaTrigger, setQaTrigger] = useState('')
   const [qaExpansion, setQaExpansion] = useState('')
   const [qaAdded, setQaAdded] = useState(false)
@@ -94,13 +93,11 @@ export function HomePage() {
     day: 'numeric',
   })
 
-  const handleQuickAddDict = () => {
-    const from = qaFrom.trim()
-    const to = qaTo.trim()
-    if (!from || !to) return
-    store.addDictionaryEntry(from, to)
-    setQaFrom('')
-    setQaTo('')
+  const handleQuickAddVocab = () => {
+    const word = qaWord.trim()
+    if (!word) return
+    store.addVocabularyWord(word)
+    setQaWord('')
     setQaAdded(true)
     setTimeout(() => setQaAdded(false), 1200)
   }
@@ -330,19 +327,19 @@ export function HomePage() {
           )}
         </div>
 
-        {/* Quick-add dictionary/snippets */}
+        {/* Quick-add vocabulary/snippets */}
         <div className="flex-1 rounded-card border border-card-border bg-card p-4 hover-lift">
           {/* Tab header */}
           <div className="flex items-center gap-3 mb-3">
             <button
-              onClick={() => setQuickAddTab('dictionary')}
+              onClick={() => setQuickAddTab('vocabulary')}
               className={`flex items-center gap-1.5 text-[13px] font-semibold transition-colors ${
-                quickAddTab === 'dictionary' ? 'text-dm-primary' : 'text-dm-tertiary hover:text-dm-muted'
+                quickAddTab === 'vocabulary' ? 'text-dm-primary' : 'text-dm-tertiary hover:text-dm-muted'
               }`}
             >
-              <BookOpen size={14} />
-              Dictionary
-              <span className="text-[10px] font-normal text-dm-secondary">{store.dictionary.length}</span>
+              <BookText size={14} />
+              Vocabulary
+              <span className="text-[10px] font-normal text-dm-secondary">{store.vocabulary.length}</span>
             </button>
             <span className="text-dm-row-sep">|</span>
             <button
@@ -361,27 +358,19 @@ export function HomePage() {
             <div className="flex items-center justify-center py-4 text-[12px] text-chirp-success font-medium animate-fade-in">
               Added
             </div>
-          ) : quickAddTab === 'dictionary' ? (
+          ) : quickAddTab === 'vocabulary' ? (
             <div className="flex gap-2">
               <input
                 type="text"
-                value={qaFrom}
-                onChange={(e) => setQaFrom(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleQuickAddDict()}
-                placeholder="Heard..."
-                className="flex-1 h-[34px] rounded-lg border border-card-border bg-card-hover px-2.5 text-[12px] text-dm-primary placeholder:text-dm-tertiary focus:border-chirp-yellow focus:outline-none transition-colors"
-              />
-              <input
-                type="text"
-                value={qaTo}
-                onChange={(e) => setQaTo(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleQuickAddDict()}
-                placeholder="Replace with..."
+                value={qaWord}
+                onChange={(e) => setQaWord(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleQuickAddVocab()}
+                placeholder="Add a word or name..."
                 className="flex-1 h-[34px] rounded-lg border border-card-border bg-card-hover px-2.5 text-[12px] text-dm-primary placeholder:text-dm-tertiary focus:border-chirp-yellow focus:outline-none transition-colors"
               />
               <button
-                onClick={handleQuickAddDict}
-                disabled={!qaFrom.trim() || !qaTo.trim()}
+                onClick={handleQuickAddVocab}
+                disabled={!qaWord.trim()}
                 className="h-[34px] px-3 rounded-lg bg-dm-btn-bg text-dm-btn-text text-[12px] font-medium disabled:bg-dm-btn-disabled-bg transition-colors"
               >
                 Add

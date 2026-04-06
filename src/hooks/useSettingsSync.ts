@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from '../stores/appStore'
-import type { DictionaryEntry, TranscriptionEntry } from '../stores/appStore'
+import type { TranscriptionEntry } from '../stores/appStore'
 import { useTauri } from './useTauri'
 
 // Settings keys that should be synced to the backend
@@ -53,10 +53,10 @@ export function useSettingsSync() {
       useAppStore.getState().setHistory(entries)
     }).catch((e) => console.error('Failed to load history:', e))
 
-    // Load dictionary
-    invoke('get_dictionary').then((entries) => {
-      useAppStore.getState().setDictionary(entries as DictionaryEntry[])
-    }).catch((e) => console.error('Failed to load dictionary:', e))
+    // Load vocabulary
+    invoke('get_vocabulary').then((words) => {
+      useAppStore.getState().setVocabulary(words as string[])
+    }).catch((e) => console.error('Failed to load vocabulary:', e))
 
     // Load snippets
     tauri.getSnippets().then((entries) => {
@@ -124,7 +124,7 @@ export function useSettingsSync() {
       }
     }).then((fn) => unlisteners.push(fn))
 
-    // Subscribe to store changes and sync settings + dictionary to backend
+    // Subscribe to store changes and sync settings + vocabulary to backend
     const unsub = useAppStore.subscribe((state, prevState) => {
       if (!state.settingsLoaded) return
       if (suppressCount.current > 0) return
@@ -141,11 +141,11 @@ export function useSettingsSync() {
         }).catch((e) => console.error('Failed to sync settings:', e))
       }
 
-      // Sync dictionary changes
-      if (state.dictionary !== prevState.dictionary) {
-        invoke('update_dictionary', { entries: state.dictionary }).then(() => {
+      // Sync vocabulary changes
+      if (state.vocabulary !== prevState.vocabulary) {
+        invoke('update_vocabulary', { words: state.vocabulary }).then(() => {
           useAppStore.getState().setSettingsSaved(true)
-        }).catch((e) => console.error('Failed to sync dictionary:', e))
+        }).catch((e) => console.error('Failed to sync vocabulary:', e))
       }
 
       // Sync snippet changes

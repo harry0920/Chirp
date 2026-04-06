@@ -2,7 +2,6 @@ mod announcements;
 mod audio;
 mod cleanup;
 mod commands;
-mod dictionary;
 mod feedback;
 mod history;
 #[cfg(windows)]
@@ -20,7 +19,7 @@ mod transcribe;
 
 
 use commands::{RecordingStartTime, ResamplerFlushState, StreamActiveState, StreamErrorState, StreamHandle};
-use state::{AppState, AudioBuffer, SharedState};
+use state::{AppState, AudioBuffer, SharedState, VadFlushHandle, VadReceiverHandle, VadSender, VadTranscripts};
 use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -57,7 +56,7 @@ pub fn run() {
                         "LLM cleanup:",
                         "After AI cleanup",
                         "clipboard",
-                        "dictionary",
+                        "vocabulary",
                     ];
                     if skip.iter().any(|p| msg.contains(p)) {
                         return None;
@@ -82,7 +81,7 @@ pub fn run() {
     } else {
         None
     };
-    let initial_dictionary = settings::load_dictionary();
+    let initial_vocabulary = settings::load_vocabulary();
     let initial_snippets = settings::load_snippets();
     let mut initial_history = history::load_history();
     history::prune_history(&mut initial_history, initial_settings.history_retention_days);
@@ -123,7 +122,7 @@ pub fn run() {
         .manage::<SharedState>({
             Arc::new(tokio::sync::Mutex::new(AppState::new(
                 initial_settings,
-                initial_dictionary,
+                initial_vocabulary,
                 initial_snippets,
                 initial_history,
             )))
@@ -134,11 +133,15 @@ pub fn run() {
         .manage(ResamplerFlushState(std::sync::Mutex::new(None)))
         .manage(RecordingStartTime(std::sync::Mutex::new(None)))
         .manage(StreamActiveState(std::sync::Mutex::new(None)))
+        .manage::<VadTranscripts>(Arc::new(std::sync::Mutex::new(Vec::new())))
+        .manage(VadReceiverHandle(std::sync::Mutex::new(None)))
+        .manage(VadSender(std::sync::Mutex::new(None)))
+        .manage(VadFlushHandle(std::sync::Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::update_settings,
-            commands::get_dictionary,
-            commands::update_dictionary,
+            commands::get_vocabulary,
+            commands::update_vocabulary,
             commands::get_audio_devices,
             commands::get_input_level,
             commands::start_recording,
@@ -310,23 +313,26 @@ pub fn run() {
                             if win.is_visible().unwrap_or(false) {
                                 let _ = win.hide();
                             } else {
-                                // Use tray icon rect (fixed position) not mouse cursor
+                                // Get the scale factor so we can normalize to logical coords.
+                                // Tray rect may arrive as physical pixels on Windows with DPI scaling.
+                                let scale = win.scale_factor().unwrap_or(1.0);
+
                                 let icon_x = match rect.position {
-                                    tauri::Position::Physical(p) => p.x as f64,
+                                    tauri::Position::Physical(p) => p.x as f64 / scale,
                                     tauri::Position::Logical(p) => p.x,
                                 };
                                 let icon_y = match rect.position {
-                                    tauri::Position::Physical(p) => p.y as f64,
+                                    tauri::Position::Physical(p) => p.y as f64 / scale,
                                     tauri::Position::Logical(p) => p.y,
                                 };
                                 let icon_w = match rect.size {
-                                    tauri::Size::Physical(s) => s.width as f64,
+                                    tauri::Size::Physical(s) => s.width as f64 / scale,
                                     tauri::Size::Logical(s) => s.width,
                                 };
 
                                 let popup_w = 320.0_f64;
                                 let popup_h = 440.0_f64;
-                                let gap = 12.0_f64;
+                                let gap = 8.0_f64;
 
                                 // Center popup horizontally on the tray icon
                                 let x = icon_x + icon_w / 2.0 - popup_w / 2.0;
@@ -340,9 +346,7 @@ pub fn run() {
                                 let x = if x < 0.0 { 0.0 } else { x };
                                 let y = if y < 0.0 { 0.0 } else { y };
 
-                                let _ = win.set_position(tauri::PhysicalPosition::new(
-                                    x as i32, y as i32,
-                                ));
+                                let _ = win.set_position(tauri::LogicalPosition::new(x, y));
                                 let _ = win.show();
                                 let _ = win.set_focus();
                                 let _ = app.emit("tray-popup-shown", ());

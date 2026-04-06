@@ -4,11 +4,6 @@ import { DEFAULT_SETTINGS, type ErrorType } from '../lib/constants'
 export type AppStatus = 'idle' | 'listening' | 'processing' | 'polishing' | 'done' | 'error'
 export type SttModel = 'parakeet-tdt-0.6b'
 
-export interface DictionaryEntry {
-  from: string
-  to: string
-}
-
 export interface SnippetEntry {
   trigger: string
   expansion: string
@@ -55,8 +50,8 @@ export interface AppState {
   beamSearch: boolean
   llmDownloadProgress: number | null
 
-  // Dictionary
-  dictionary: DictionaryEntry[]
+  // Vocabulary
+  vocabulary: string[]
 
   // Snippets
   snippets: SnippetEntry[]
@@ -115,9 +110,9 @@ export interface AppState {
   setLlmDownloadProgress: (progress: number | null) => void
   setLlmReady: (ready: boolean) => void
   updateSettings: (partial: Partial<AppState>) => void
-  addDictionaryEntry: (from: string, to: string) => void
-  removeDictionaryEntry: (index: number) => void
-  setDictionary: (dictionary: DictionaryEntry[]) => void
+  addVocabularyWord: (word: string) => void
+  removeVocabularyWord: (index: number) => void
+  setVocabulary: (vocabulary: string[]) => void
   setSnippets: (snippets: SnippetEntry[]) => void
   addSnippet: (trigger: string, expansion: string) => void
   updateSnippet: (index: number, trigger: string, expansion: string) => void
@@ -167,8 +162,8 @@ export const useAppStore = create<AppState>((set) => ({
   // Beam Search
   beamSearch: DEFAULT_SETTINGS.beamSearch,
 
-  // Dictionary
-  dictionary: [],
+  // Vocabulary
+  vocabulary: [],
 
   // Snippets
   snippets: [],
@@ -225,11 +220,11 @@ export const useAppStore = create<AppState>((set) => ({
   setLlmDownloadProgress: (llmDownloadProgress) => set({ llmDownloadProgress }),
   setLlmReady: (llmReady) => set({ llmReady }),
   updateSettings: (partial) => set(partial),
-  addDictionaryEntry: (from, to) =>
-    set((state) => ({ dictionary: [...state.dictionary, { from, to }] })),
-  removeDictionaryEntry: (index) =>
-    set((state) => ({ dictionary: state.dictionary.filter((_, i) => i !== index) })),
-  setDictionary: (dictionary) => set({ dictionary }),
+  addVocabularyWord: (word) =>
+    set((state) => ({ vocabulary: [...state.vocabulary, word] })),
+  removeVocabularyWord: (index) =>
+    set((state) => ({ vocabulary: state.vocabulary.filter((_, i) => i !== index) })),
+  setVocabulary: (vocabulary) => set({ vocabulary }),
   setSnippets: (snippets) => set({ snippets }),
   addSnippet: (trigger, expansion) =>
     set((state) => ({ snippets: [...state.snippets, { trigger, expansion }] })),

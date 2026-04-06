@@ -1,6 +1,5 @@
 use crate::audio;
 use crate::cleanup;
-use crate::dictionary;
 use crate::history;
 use crate::inject;
 use crate::llm;
@@ -17,6 +16,80 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 const CHIRP_SOUND: &[u8] = include_bytes!("../sounds/chirp.wav");
+
+/// Join VAD segments with boundary cleanup. When VAD splits mid-sentence,
+/// each segment starts with a capital letter and may end with a period that
+/// doesn't belong. This fixes the most obvious artifacts.
+fn join_vad_segments(segments: &[String]) -> String {
+    if segments.is_empty() {
+        return String::new();
+    }
+
+    let mut result = String::new();
+
+    for (i, seg) in segments.iter().enumerate() {
+        let trimmed = seg.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if i == 0 {
+            // First segment: keep as-is
+            result.push_str(trimmed);
+            continue;
+        }
+
+        // Check if previous segment ended with sentence-ending punctuation
+        let prev_ended_sentence = result.ends_with('.')
+            || result.ends_with('?')
+            || result.ends_with('!');
+
+        // If previous segment ended with a period but was very short (1-3 words),
+        // it's likely a VAD artifact — strip the period
+        if result.ends_with('.') {
+            let last_segment_words = result.rsplit(' ')
+                .take_while(|w| !w.ends_with('.') && !w.ends_with('?') && !w.ends_with('!'))
+                .count();
+            // If the trailing sentence fragment is 1-3 words, strip the period
+            // (e.g., "Time." or "Is like." are artifacts)
+            if last_segment_words <= 3 {
+                // Check the actual last "sentence" by finding the last sentence break before this one
+                let before_period = &result[..result.len() - 1];
+                let last_real_end = before_period.rfind(|c: char| c == '.' || c == '?' || c == '!');
+                let fragment = match last_real_end {
+                    Some(pos) => &before_period[pos + 1..],
+                    None => before_period,
+                };
+                let word_count = fragment.split_whitespace().count();
+                if word_count <= 3 {
+                    result.pop(); // remove the trailing period
+                }
+            }
+        }
+
+        result.push(' ');
+
+        let prev_ended_sentence_now = result.trim_end().ends_with('.')
+            || result.trim_end().ends_with('?')
+            || result.trim_end().ends_with('!');
+
+        if prev_ended_sentence_now {
+            // Previous was a real sentence end — keep the capitalization
+            result.push_str(trimmed);
+        } else {
+            // Mid-sentence join — lowercase the first character
+            let mut chars = trimmed.chars();
+            if let Some(first) = chars.next() {
+                for c in first.to_lowercase() {
+                    result.push(c);
+                }
+                result.push_str(chars.as_str());
+            }
+        }
+    }
+
+    result
+}
 
 /// Active audio stream handle — wrapped in an unsafe Send wrapper because
 /// cpal::Stream is !Send but we only access it from the main thread.
@@ -152,22 +225,22 @@ pub async fn update_settings(
 }
 
 #[tauri::command]
-pub async fn get_dictionary(state: State<'_, SharedState>) -> Result<Vec<DictionaryEntry>, String> {
+pub async fn get_vocabulary(state: State<'_, SharedState>) -> Result<Vec<String>, String> {
     let s = state.lock().await;
-    Ok(s.dictionary.clone())
+    Ok(s.vocabulary.clone())
 }
 
 #[tauri::command]
-pub async fn update_dictionary(
-    entries: Vec<DictionaryEntry>,
+pub async fn update_vocabulary(
+    words: Vec<String>,
     state: State<'_, SharedState>,
 ) -> Result<(), String> {
-    if entries.len() > 500 {
-        return Err("Dictionary cannot exceed 500 entries".to_string());
+    if words.len() > 500 {
+        return Err("Vocabulary cannot exceed 500 words".to_string());
     }
     let mut s = state.lock().await;
-    s.dictionary = entries.clone();
-    settings::save_dictionary(&s.dictionary)?;
+    s.vocabulary = words.clone();
+    settings::save_vocabulary(&s.vocabulary)?;
     Ok(())
 }
 
@@ -219,6 +292,10 @@ pub async fn start_recording(
     resampler_flush: State<'_, ResamplerFlushState>,
     recording_start: State<'_, RecordingStartTime>,
     stream_active_state: State<'_, StreamActiveState>,
+    vad_transcripts: State<'_, VadTranscripts>,
+    vad_receiver_handle: State<'_, VadReceiverHandle>,
+    vad_sender: State<'_, VadSender>,
+    vad_flush_handle: State<'_, VadFlushHandle>,
 ) -> Result<(), String> {
     let mut s = state.lock().await;
 
@@ -240,15 +317,70 @@ pub async fn start_recording(
         }
     }
 
-    // Clear audio buffer
+    // Clear audio buffer and VAD transcripts
     buffer.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    vad_transcripts.lock().unwrap_or_else(|e| e.into_inner()).clear();
 
     // Record wall-clock start time for sample rate sanity check
     *recording_start.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
 
     let device_id = s.settings.input_device.clone();
+    let recognizer_for_vad = s.recognizer.clone();
     s.recording_state = RecordingState::Recording;
     drop(s);
+
+    // Set up VAD streaming if the model is available
+    let vad_model = settings::vad_model_path();
+    let vad_arc = if vad_model.exists() {
+        let (tx, rx) = crossbeam_channel::unbounded::<Vec<f32>>();
+
+        // Store sender so we can send poison pill on stop
+        *vad_sender.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(tx.clone());
+
+        let vad_st = audio::create_vad_state(
+            &vad_model.to_string_lossy(),
+            tx,
+        );
+
+        if let Some(vs) = vad_st {
+            let vad_arc = Arc::new(std::sync::Mutex::new(vs));
+            *vad_flush_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(vad_arc.clone());
+
+            // Spawn receiver thread: transcribes segments as they arrive
+            let transcripts = vad_transcripts.inner().clone();
+            let rec = recognizer_for_vad.unwrap();
+            let handle = std::thread::Builder::new()
+                .name("vad-receiver".into())
+                .spawn(move || {
+                    let mut seg_idx = 0u32;
+                    while let Ok(segment_audio) = rx.recv() {
+                        if segment_audio.is_empty() { break; } // poison pill
+                        let dur = segment_audio.len() as f32 / 16000.0;
+                        log::info!("VAD segment {seg_idx}: {:.1}s ({} samples)", dur, segment_audio.len());
+                        match transcribe::transcribe(&rec, &segment_audio) {
+                            Ok(text) => {
+                                if !text.is_empty() {
+                                    log::info!("VAD segment {seg_idx} transcript: '{text}'");
+                                    transcripts.lock().unwrap_or_else(|e| e.into_inner()).push(text);
+                                }
+                            }
+                            Err(e) => log::error!("VAD segment {seg_idx} transcription failed: {e}"),
+                        }
+                        seg_idx += 1;
+                    }
+                    log::info!("VAD receiver thread exiting after {seg_idx} segments");
+                })
+                .ok();
+            *vad_receiver_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = handle;
+
+            Some(vad_arc)
+        } else {
+            None
+        }
+    } else {
+        log::info!("VAD model not found, using non-streaming transcription");
+        None
+    };
 
     // Start audio capture — convert Result to Option immediately so the
     // non-Send cpal::Stream doesn't live across an await point.
@@ -256,6 +388,7 @@ pub async fn start_recording(
         &device_id,
         buffer.inner().clone(),
         app_handle.clone(),
+        vad_arc,
     ) {
         Ok((stream, error_flag, active_flag, resampler_state)) => {
             *stream_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(StreamWrapper(stream));
@@ -313,6 +446,10 @@ pub async fn stop_recording(
     resampler_flush: State<'_, ResamplerFlushState>,
     recording_start: State<'_, RecordingStartTime>,
     stream_active_state: State<'_, StreamActiveState>,
+    vad_transcripts: State<'_, VadTranscripts>,
+    vad_receiver_handle: State<'_, VadReceiverHandle>,
+    vad_sender: State<'_, VadSender>,
+    vad_flush_handle: State<'_, VadFlushHandle>,
 ) -> Result<TranscriptionResult, String> {
     let start_time = Instant::now();
 
@@ -354,6 +491,35 @@ pub async fn stop_recording(
         .map_or(false, |flag| flag.load(Ordering::SeqCst));
     if had_stream_error {
         log::warn!("Audio stream reported an error during recording — device may have disconnected");
+    }
+
+    // Flush VAD to capture the final speech segment, then shut down receiver thread
+    {
+        let flush = vad_flush_handle.0.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(ref vad_arc) = *flush {
+            audio::flush_vad(vad_arc);
+        }
+    }
+    // Send poison pill to stop receiver thread
+    {
+        let mut sender = vad_sender.0.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(tx) = sender.take() {
+            let _ = tx.send(Vec::new());
+        }
+    }
+    // Join receiver thread (with timeout via try_join)
+    {
+        let mut handle = vad_receiver_handle.0.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(h) = handle.take() {
+            if h.join().is_err() {
+                log::warn!("VAD receiver thread panicked");
+            }
+        }
+    }
+    // Clean up VAD flush handle
+    {
+        let mut flush = vad_flush_handle.0.lock().unwrap_or_else(|e| e.into_inner());
+        *flush = None;
     }
 
     // Audio callbacks run on a separate thread; give in-flight callbacks
@@ -420,13 +586,13 @@ pub async fn stop_recording(
     // Grab what we need from state before entering blocking thread.
     // Clone the Arc<SherpaRecognizer> so we can release the state lock
     // before the expensive transcription step.
-    let (recognizer, smart_fmt, dict, snips, ai_cleanup, llm_port, tone_mode, http_client) = {
+    let (recognizer, smart_fmt, vocab, snips, ai_cleanup, llm_port, tone_mode, http_client) = {
         let s = state.lock().await;
         let rec = s.recognizer.clone().ok_or("model_not_loaded".to_string())?;
         (
             rec,
             s.settings.smart_formatting,
-            s.dictionary.clone(),
+            s.vocabulary.clone(),
             s.snippets.clone(),
             s.settings.ai_cleanup,
             s.llm_port,
@@ -435,53 +601,63 @@ pub async fn stop_recording(
         )
     };
 
-    let had_dictionary = !dict.is_empty();
-    // Extract dictionary "to" terms for LLM vocabulary hints (before dict moves into closure)
-    let dict_terms: Vec<String> = dict.iter().map(|e| e.to.clone()).collect();
+    let had_vocabulary = !vocab.is_empty();
 
-    // Transcribe using the sherpa-onnx recognizer.
-    // Chunk long audio into 30s segments (1s overlap) so the 0.6B model
-    // stays in its comfort zone — longer buffers produce gibberish.
+    // Check if VAD produced transcripts during recording
+    let vad_texts: Vec<String> = {
+        let mut vt = vad_transcripts.lock().unwrap_or_else(|e| e.into_inner());
+        std::mem::take(&mut *vt)
+    };
+    let use_vad = !vad_texts.is_empty();
+
     let result = tokio::task::spawn_blocking(move || {
-        let chunks = crate::transcribe::chunk_audio(&audio_data, 16000, 30.0, 1.0);
-        log::info!("Starting Parakeet TDT transcription ({} chunk(s))...", chunks.len());
+        let raw = if use_vad {
+            // VAD streaming: segments were already transcribed in parallel
+            log::info!("Using {} VAD-streamed transcripts", vad_texts.len());
+            let merged = join_vad_segments(&vad_texts);
+            if merged.trim().is_empty() {
+                log::warn!("VAD transcripts all empty");
+                return Err("transcription_failed".to_string());
+            }
+            merged
+        } else {
+            // Fallback: chunk the full audio buffer and transcribe (original behavior)
+            let chunks = crate::transcribe::chunk_audio(&audio_data, 16000, 30.0, 1.0);
+            log::info!("Starting Parakeet TDT transcription ({} chunk(s))...", chunks.len());
 
-        let mut transcriptions = Vec::new();
-        for (i, chunk) in chunks.iter().enumerate() {
-            // Per-chunk audio diagnostics
-            let chunk_rms = (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt();
-            let chunk_peak = chunk.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
-            let chunk_nonzero = chunk.iter().filter(|&&s| s.abs() > 0.001).count();
-            log::info!("Chunk {i}: {} samples ({:.1}s), rms={chunk_rms:.6}, peak={chunk_peak:.4}, nonzero={chunk_nonzero}/{} ({:.1}%)",
-                chunk.len(), chunk.len() as f32 / 16000.0,
-                chunk.len(), chunk_nonzero as f64 / chunk.len() as f64 * 100.0);
+            let mut transcriptions = Vec::new();
+            for (i, chunk) in chunks.iter().enumerate() {
+                let chunk_rms = (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt();
+                let chunk_peak = chunk.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+                let chunk_nonzero = chunk.iter().filter(|&&s| s.abs() > 0.001).count();
+                log::info!("Chunk {i}: {} samples ({:.1}s), rms={chunk_rms:.6}, peak={chunk_peak:.4}, nonzero={chunk_nonzero}/{} ({:.1}%)",
+                    chunk.len(), chunk.len() as f32 / 16000.0,
+                    chunk.len(), chunk_nonzero as f64 / chunk.len() as f64 * 100.0);
 
-            let chunk_raw = transcribe::transcribe(&recognizer, chunk)
-                .map_err(|e| {
-                    log::error!("Transcription error on chunk {i}: {e}");
-                    "transcription_failed".to_string()
-                })?;
-            log::info!("Parakeet chunk {i}: '{chunk_raw}'");
-            transcriptions.push(chunk_raw);
-        }
+                let chunk_raw = transcribe::transcribe(&recognizer, chunk)
+                    .map_err(|e| {
+                        log::error!("Transcription error on chunk {i}: {e}");
+                        "transcription_failed".to_string()
+                    })?;
+                log::info!("Parakeet chunk {i}: '{chunk_raw}'");
+                transcriptions.push(chunk_raw);
+            }
 
-        let raw = crate::transcribe::merge_transcriptions(transcriptions);
-
-        if raw.is_empty() {
-            log::warn!("Transcription returned empty text");
-            return Err("transcription_failed".to_string());
-        }
+            let merged = crate::transcribe::merge_transcriptions(transcriptions);
+            if merged.is_empty() {
+                log::warn!("Transcription returned empty text");
+                return Err("transcription_failed".to_string());
+            }
+            merged
+        };
 
         // Regex pre-pass: remove fillers, spoken punctuation, format numbers
-        // before sending to LLM — reduces workload and gives cleaner input
         let formatted = cleanup::cleanup_text(&raw, smart_fmt);
 
-        // Apply dictionary and snippet expansions BEFORE AI cleanup so the
-        // LLM doesn't alter trigger phrases (e.g. "my email" → "My E-mail").
-        let after_dict = dictionary::apply_dictionary(&formatted, &dict);
-        let after_snips = snippets::apply_snippets(&after_dict, &snips);
+        // Apply snippet expansions BEFORE AI cleanup
+        let after_snips = snippets::apply_snippets(&formatted, &snips);
 
-        log::info!("After regex+dict+snips: '{after_snips}'");
+        log::info!("After regex+snips: '{after_snips}'");
         Ok(after_snips)
     })
     .await
@@ -503,7 +679,7 @@ pub async fn stop_recording(
         let port = llm_port.unwrap();
         let _ = app_handle.emit("recording-state", "polishing");
         log::info!("Running Gemma cleanup on text...");
-        let cleanup_result = llm::cleanup_text(port, &formatted, &tone_mode, &dict_terms, &http_client).await;
+        let cleanup_result = llm::cleanup_text(port, &formatted, &tone_mode, &vocab, &http_client).await;
         match cleanup_result {
             Ok(cleaned) => {
                 log::info!("LLM cleanup: '{cleaned}'");
@@ -576,7 +752,7 @@ pub async fn stop_recording(
             "duration_seconds": (duration_ms as f64 / 1000.0),
             "word_count": word_count,
             "used_ai_cleanup": was_cleaned_up,
-            "used_dictionary": had_dictionary,
+            "used_vocabulary": had_vocabulary,
         })));
     }
 
@@ -646,6 +822,11 @@ pub async fn download_model(
     state: State<'_, SharedState>,
 ) -> Result<(), String> {
     transcribe::download_model(&model, app_handle.clone()).await?;
+
+    // Download Silero VAD model alongside (small, ~2MB)
+    if let Err(e) = settings::download_vad_model().await {
+        log::warn!("VAD model download failed (non-fatal): {e}");
+    }
 
     // Track model_downloaded telemetry (no-op if help_improve is off)
     {
@@ -718,7 +899,7 @@ pub async fn test_microphone(
     buffer.lock().unwrap_or_else(|e| e.into_inner()).clear();
 
     // Start capture
-    let (stream, _error_flag, active_flag, _resampler_state) = audio::start_capture(&device_id, buffer.inner().clone(), app_handle)?;
+    let (stream, _error_flag, active_flag, _resampler_state) = audio::start_capture(&device_id, buffer.inner().clone(), app_handle, None)?;
     *stream_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(StreamWrapper(stream));
 
     // Record for 3 seconds

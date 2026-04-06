@@ -4,7 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getVersion } from '@tauri-apps/api/app'
 import { check } from '@tauri-apps/plugin-updater'
 import { open } from '@tauri-apps/plugin-shell'
-import { Home, BookOpen, Zap, Settings as SettingsIcon, Check, Minus, Square, X, Heart } from 'lucide-react'
+import { Home, BookText, Zap, Settings as SettingsIcon, Check, Minus, Square, X, Heart } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
@@ -14,18 +14,18 @@ import { AboutModal } from '../shared/AboutModal'
 import { UpgradeModal } from '../shared/UpgradeModal'
 import { formatHotkey } from '../../lib/utils'
 import { HomePage } from './HomePage'
-import { DictionaryPage } from './DictionaryPage'
+import { VocabularyPage } from './VocabularyPage'
 import { SnippetsPage } from './SnippetsPage'
 import { SettingsPage } from './SettingsPage'
 const NAV_ITEMS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'home', label: 'Home', icon: Home },
-  { id: 'dictionary', label: 'Dictionary', icon: BookOpen },
+  { id: 'vocabulary', label: 'Vocabulary', icon: BookText },
   { id: 'snippets', label: 'Snippets', icon: Zap },
 ]
 
 const PAGES: Record<string, React.FC> = {
   home: HomePage,
-  dictionary: DictionaryPage,
+  vocabulary: VocabularyPage,
   snippets: SnippetsPage,
   settings: SettingsPage,
 }

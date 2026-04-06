@@ -104,13 +104,6 @@ impl Default for Settings {
     }
 }
 
-/// Dictionary entry for word replacement
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DictionaryEntry {
-    pub from: String,
-    pub to: String,
-}
-
 /// Snippet entry for text expansion
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnippetEntry {
@@ -168,7 +161,7 @@ pub struct AmplitudeData {
 /// Main application state shared across commands
 pub struct AppState {
     pub settings: Settings,
-    pub dictionary: Vec<DictionaryEntry>,
+    pub vocabulary: Vec<String>,
     pub snippets: Vec<SnippetEntry>,
     pub history: Vec<TranscriptionEntry>,
     pub recording_state: RecordingState,
@@ -184,10 +177,10 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, dictionary: Vec<DictionaryEntry>, snippets: Vec<SnippetEntry>, history: Vec<TranscriptionEntry>) -> Self {
+    pub fn new(settings: Settings, vocabulary: Vec<String>, snippets: Vec<SnippetEntry>, history: Vec<TranscriptionEntry>) -> Self {
         Self {
             settings,
-            dictionary,
+            vocabulary,
             snippets,
             history,
             recording_state: RecordingState::Idle,
@@ -210,3 +203,15 @@ pub type SharedState = Arc<Mutex<AppState>>;
 
 /// Separate audio buffer to avoid blocking cpal callback on main state lock
 pub type AudioBuffer = Arc<std::sync::Mutex<Vec<f32>>>;
+
+/// Accumulated transcripts from VAD segments, filled by receiver thread
+pub type VadTranscripts = Arc<std::sync::Mutex<Vec<String>>>;
+
+/// Handle to the VAD receiver thread (joined on stop_recording)
+pub struct VadReceiverHandle(pub std::sync::Mutex<Option<std::thread::JoinHandle<()>>>);
+
+/// Sender for the VAD segment channel (needed to send poison pill on stop)
+pub struct VadSender(pub std::sync::Mutex<Option<crossbeam_channel::Sender<Vec<f32>>>>);
+
+/// Handle to flush VAD on stop (kept separate from audio callback's copy)
+pub struct VadFlushHandle(pub std::sync::Mutex<Option<Arc<std::sync::Mutex<crate::audio::VadState>>>>);

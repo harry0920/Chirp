@@ -1,4 +1,4 @@
-use crate::state::{DictionaryEntry, Settings, SnippetEntry};
+use crate::state::{Settings, SnippetEntry};
 use std::path::PathBuf;
 
 /// Migrate old Tauri shortcut format (e.g., "CmdOrCtrl+Shift+Space") to new
@@ -69,8 +69,8 @@ fn settings_path() -> PathBuf {
     config_dir().join("settings.json")
 }
 
-fn dictionary_path() -> PathBuf {
-    config_dir().join("dictionary.json")
+fn vocabulary_path() -> PathBuf {
+    config_dir().join("vocabulary.json")
 }
 
 /// Remove old model files from previous versions (Qwen GGUF, chirp-cleanup T5)
@@ -141,15 +141,32 @@ pub fn save_settings(settings: &Settings) -> Result<(), String> {
     std::fs::write(settings_path(), data).map_err(|e| format!("Failed to write settings: {e}"))
 }
 
-/// Load dictionary from disk
-pub fn load_dictionary() -> Vec<DictionaryEntry> {
-    let path = dictionary_path();
+/// Load vocabulary from disk
+pub fn load_vocabulary() -> Vec<String> {
+    let path = vocabulary_path();
     match std::fs::read_to_string(&path) {
         Ok(data) => serde_json::from_str(&data).unwrap_or_else(|e| {
-            log::warn!("Corrupted dictionary JSON, resetting: {e}");
+            log::warn!("Corrupted vocabulary JSON, resetting: {e}");
             Vec::new()
         }),
-        Err(_) => Vec::new(),
+        Err(_) => {
+            // Migrate from old dictionary.json if it exists
+            let old_path = config_dir().join("dictionary.json");
+            if let Ok(old_data) = std::fs::read_to_string(&old_path) {
+                #[derive(serde::Deserialize)]
+                struct OldEntry { #[allow(dead_code)] from: String, to: String }
+                if let Ok(entries) = serde_json::from_str::<Vec<OldEntry>>(&old_data) {
+                    let vocab: Vec<String> = entries.into_iter().map(|e| e.to).collect();
+                    if !vocab.is_empty() {
+                        log::info!("Migrated {} dictionary entries to vocabulary", vocab.len());
+                        let _ = save_vocabulary(&vocab);
+                        let _ = std::fs::remove_file(&old_path);
+                        return vocab;
+                    }
+                }
+            }
+            Vec::new()
+        }
     }
 }
 
@@ -192,12 +209,66 @@ fn default_snippets() -> Vec<SnippetEntry> {
     ]
 }
 
-/// Save dictionary to disk
-pub fn save_dictionary(entries: &[DictionaryEntry]) -> Result<(), String> {
+/// Path to the Silero VAD model
+pub fn vad_model_path() -> PathBuf {
+    models_dir().join("silero_vad.onnx")
+}
+
+/// Check if the VAD model exists on disk
+pub fn vad_model_exists() -> bool {
+    vad_model_path().exists()
+}
+
+const VAD_MODEL_URL: &str = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx";
+
+/// Download the Silero VAD model (~2MB)
+pub async fn download_vad_model() -> Result<(), String> {
+    let dest = vad_model_path();
+    if dest.exists() {
+        return Ok(());
+    }
+
+    let dir = models_dir();
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| format!("Failed to create models dir: {e}"))?;
+
+    let tmp_path = dest.with_extension("onnx.tmp");
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(VAD_MODEL_URL)
+        .send()
+        .await
+        .map_err(|e| format!("VAD model download failed: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("VAD download failed with status: {}", response.status()));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read VAD model: {e}"))?;
+
+    tokio::fs::write(&tmp_path, &bytes)
+        .await
+        .map_err(|e| format!("Failed to write VAD model: {e}"))?;
+
+    tokio::fs::rename(&tmp_path, &dest)
+        .await
+        .map_err(|e| format!("Failed to finalize VAD model: {e}"))?;
+
+    log::info!("Silero VAD model downloaded ({} bytes)", bytes.len());
+    Ok(())
+}
+
+/// Save vocabulary to disk
+pub fn save_vocabulary(words: &[String]) -> Result<(), String> {
     let dir = config_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create config dir: {e}"))?;
-    let data = serde_json::to_string_pretty(entries)
+    let data = serde_json::to_string_pretty(words)
         .map_err(|e| format!("Failed to serialize: {e}"))?;
-    std::fs::write(dictionary_path(), data)
-        .map_err(|e| format!("Failed to write dictionary: {e}"))
+    std::fs::write(vocabulary_path(), data)
+        .map_err(|e| format!("Failed to write vocabulary: {e}"))
 }

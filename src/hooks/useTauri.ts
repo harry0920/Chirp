@@ -89,10 +89,10 @@ function createTauriApi() {
     return await invoke<Record<string, unknown>>('get_settings')
   }
 
-  const updateDictionary = async (
-    entries: Array<{ from: string; to: string }>
+  const updateVocabulary = async (
+    words: string[]
   ): Promise<void> => {
-    await invoke('update_dictionary', { entries })
+    await invoke('update_vocabulary', { words })
   }
 
   const getHistory = async (): Promise<TranscriptionEntry[]> => {
@@ -192,7 +192,7 @@ function createTauriApi() {
     getModelStatus,
     updateSettings,
     getSettings,
-    updateDictionary,
+    updateVocabulary,
     getHistory,
     clearHistory,
     deleteHistoryEntry,

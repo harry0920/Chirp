@@ -224,9 +224,20 @@ fn model_path() -> PathBuf {
     llm_dir().join(MODEL_FILENAME)
 }
 
-/// Check if llama-server binary exists
+fn version_marker_path() -> PathBuf {
+    llm_dir().join("llama-server.version")
+}
+
+/// Check if llama-server binary exists and matches the expected version.
 pub fn binary_exists() -> bool {
-    binary_path().exists()
+    if !binary_path().exists() {
+        return false;
+    }
+    // If the version marker is missing or stale, the binary needs to be replaced.
+    match std::fs::read_to_string(version_marker_path()) {
+        Ok(v) if v.trim() == LLAMA_CPP_VERSION => true,
+        _ => false,
+    }
 }
 
 /// Check if the model GGUF exists
@@ -241,9 +252,28 @@ pub async fn download_binary(app_handle: &AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| format!("Failed to create LLM dir: {e}"))?;
 
+    // Skip download if binary exists and version matches
+    if binary_exists() {
+        return Ok(());
+    }
+
+    // Clean up stale binaries from a previous llama.cpp version
     let dest = binary_path();
     if dest.exists() {
-        return Ok(());
+        log::info!("Removing stale llama-server (upgrading to {})", LLAMA_CPP_VERSION);
+        // Remove all DLLs/dylibs and the old binary so we get a clean slate
+        if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.ends_with(".dll") || name_str.ends_with(".dylib")
+                    || name_str.ends_with(".so") || name_str.contains("llama-server")
+                {
+                    let _ = tokio::fs::remove_file(entry.path()).await;
+                }
+            }
+        }
+        let _ = tokio::fs::remove_file(version_marker_path()).await;
     }
 
     let url = llama_server_url();
@@ -304,6 +334,10 @@ pub async fn download_binary(app_handle: &AppHandle) -> Result<(), String> {
     if let Err(e) = tokio::fs::remove_file(&archive_path).await {
         log::warn!("Failed to clean up LLM archive: {e}");
     }
+
+    // Write version marker so we know this binary matches our expected version
+    let _ = tokio::fs::write(version_marker_path(), LLAMA_CPP_VERSION).await;
+    log::info!("llama-server {} downloaded and extracted", LLAMA_CPP_VERSION);
 
     let _ = app_handle.emit("llm-download-progress", 100u32);
     Ok(())
@@ -482,14 +516,14 @@ async fn tokenize_text(port: u16, text: &str, client: &reqwest::Client) -> Resul
 }
 
 /// Send text through the LLM for cleanup.
-/// `dictionary_terms` provides known vocabulary so the LLM can correct ASR mishearings.
-pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, dictionary_terms: &[String], client: &reqwest::Client) -> Result<String, String> {
+/// `vocabulary` provides known words/names so the LLM can correct ASR mishearings.
+pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, vocabulary: &[String], client: &reqwest::Client) -> Result<String, String> {
     let mut prompt = system_prompt_for_mode(tone_mode);
 
-    // Inject dictionary terms as vocabulary hints
-    if !dictionary_terms.is_empty() {
+    // Inject vocabulary as hints for the LLM
+    if !vocabulary.is_empty() {
         // Cap at 30 terms to avoid bloating the context window
-        let capped: Vec<&str> = dictionary_terms.iter().take(30).map(|s| s.as_str()).collect();
+        let capped: Vec<&str> = vocabulary.iter().take(30).map(|s| s.as_str()).collect();
         let terms = capped.join(", ");
         prompt.push_str(&format!(
             "\n\nThe speaker frequently uses these terms: {}. When ASR output sounds similar to one of these, use the correct spelling.",

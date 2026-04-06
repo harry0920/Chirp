@@ -120,7 +120,7 @@ fn regexes() -> &'static CleanupRegexes {
     })
 }
 
-/// Full cleanup pipeline: filler removal → regex formatting
+/// Full cleanup pipeline: filler removal → self-correction → regex formatting
 pub fn cleanup_text(text: &str, smart_formatting: bool) -> String {
     if text.is_empty() {
         return String::new();
@@ -130,9 +130,20 @@ pub fn cleanup_text(text: &str, smart_formatting: bool) -> String {
         return text.to_string();
     }
 
+    // Remove fillers (um, uh, filler "like", etc.)
+    let result = remove_fillers(text);
+
+    // Strip self-corrections ("wait no", "I mean", "scratch that")
+    let result = strip_corrections(&result);
+    if result.is_empty() {
+        return String::new();
+    }
+
+    // Capitalize first letter after correction stripping
+    let result = capitalize_first(&result);
+
     // Regex-based formatting (spoken punctuation, numbers, etc.)
-    // Fillers and self-corrections are left for the LLM to handle with full context
-    smart_format(text)
+    smart_format(&result)
 }
 
 /// Remove common filler words from transcript

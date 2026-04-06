@@ -79,7 +79,7 @@ export function UpgradeModal() {
               We've upgraded to Google's latest
               {' '}<span className="font-semibold text-dm-primary">Gemma 4 E2B</span> model
               for better grammar, smarter corrections,
-              and dictionary-aware cleanup.
+              and vocabulary-aware cleanup.
             </p>
 
             <p className="mt-6 font-body text-[12px] text-dm-secondary">

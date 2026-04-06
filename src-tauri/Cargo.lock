@@ -721,6 +721,7 @@ dependencies = [
  "cocoa 0.26.1",
  "core-graphics 0.24.0",
  "cpal",
+ "crossbeam-channel",
  "dirs 5.0.1",
  "enigo",
  "flate2",
