@@ -1,0 +1,502 @@
+{
+  "test_cases": [
+    {
+      "name": "simple_clean",
+      "input": "The meeting is scheduled for Thursday at 3 pm in the main conference room.",
+      "ideal": "The meeting is scheduled for Thursday at 3 pm in the main conference room."
+    },
+    {
+      "name": "fillers_basic",
+      "input": "So um I think we should basically you know move forward with the proposal.",
+      "ideal": "I think we should move forward with the proposal."
+    },
+    {
+      "name": "self_correction",
+      "input": "Send the report to John actually no send it to Mike by end of day.",
+      "ideal": "Send the report to Mike by end of day."
+    },
+    {
+      "name": "stutters",
+      "input": "We we need to to update the the documentation before the release.",
+      "ideal": "We need to update the documentation before the release."
+    },
+    {
+      "name": "technical_asr_errors",
+      "input": "The kubernetes cluster is running on version 1.28 and we need to upgrade the ingar controller.",
+      "ideal": "The Kubernetes cluster is running on version 1.28 and we need to upgrade the ingress controller.",
+      "dict": [
+        "Kubernetes",
+        "ingress"
+      ]
+    },
+    {
+      "name": "repeated_ideas",
+      "input": "We need to fix the login page. The login page is broken. Users can't log in. So basically the login is not working and we need to fix it as soon as possible.",
+      "ideal": "We need to fix the login page. Users can't log in and we need to fix it as soon as possible."
+    },
+    {
+      "name": "long_complex",
+      "input": "So what I'm thinking is that we should probably restructure the entire frontend because right now it's a monolith and every time someone makes a change it breaks something else and the build times are getting really long like 15 minutes for a production build which is way too slow and it's killing our productivity.",
+      "ideal": "I'm thinking we should restructure the entire frontend because right now it's a monolith. Every time someone makes a change it breaks something else, and the build times are getting really long \u2014 15 minutes for a production build, which is killing our productivity."
+    },
+    {
+      "name": "numbers_stats",
+      "input": "Revenue increased by 23 percent last quarter from 4.2 million to 5.1 million and our customer base grew by about 15000 users.",
+      "ideal": "Revenue increased by 23% last quarter from $4.2 million to $5.1 million, and our customer base grew by about 15,000 users."
+    },
+    {
+      "name": "email_greeting",
+      "input": "Hey Sarah I wanted to follow up on yesterday's meeting. Can you send me the updated budget by Friday? Thanks John",
+      "ideal": "Hey Sarah,\n\nI wanted to follow up on yesterday's meeting. Can you send me the updated budget by Friday?\n\nThanks,\nJohn",
+      "tone": "email"
+    },
+    {
+      "name": "multi_correction",
+      "input": "The deadline is Monday no wait Tuesday actually it's Wednesday because of the holiday.",
+      "ideal": "The deadline is Wednesday because of the holiday."
+    },
+    {
+      "name": "spoken_punctuation",
+      "input": "Please send the files to john at example dot com and cc the team.",
+      "ideal": "Please send the files to john@example.com and cc the team."
+    },
+    {
+      "name": "short_quick",
+      "input": "Sounds good let's do it.",
+      "ideal": "Sounds good, let's do it."
+    },
+    {
+      "name": "mixed_fillers_corrections",
+      "input": "Um so I was thinking we could um use React no actually Vue would be better because it's lighter and um you know the team already knows it.",
+      "ideal": "I was thinking we could use Vue because it's lighter and the team already knows it."
+    },
+    {
+      "name": "chirp_specific",
+      "input": "We just updated the Cherp app to use the Parrakeet model for transcription and it's working really well.",
+      "ideal": "We just updated the Chirp app to use the Parakeet model for transcription and it's working really well.",
+      "dict": [
+        "Chirp",
+        "Parakeet",
+        "Gemma"
+      ]
+    },
+    {
+      "name": "list_dictation",
+      "input": "For the sprint we need to do three things. First fix the authentication bug. Second update the API documentation. And third deploy the new version to staging.",
+      "ideal": "For the sprint we need to do three things. First, fix the authentication bug. Second, update the API documentation. And third, deploy the new version to staging."
+    },
+    {
+      "name": "casual_tone",
+      "input": "Yeah so like the thing is the client wants it done by next week but honestly I don't think that's realistic given where we are right now.",
+      "ideal": "The client wants it done by next week, but honestly I don't think that's realistic given where we are right now."
+    },
+    {
+      "name": "heavy_stutters",
+      "input": "I I I think the the best approach would be to to first um first analyze the the data and then and then make a decision based on what we find.",
+      "ideal": "I think the best approach would be to first analyze the data and then make a decision based on what we find."
+    },
+    {
+      "name": "domain_technical",
+      "input": "The CI CD pipeline is failing because the docker image can't pull from the private registry we need to update the credentials in the github actions secrets.",
+      "ideal": "The CI/CD pipeline is failing because the Docker image can't pull from the private registry. We need to update the credentials in the GitHub Actions secrets.",
+      "dict": [
+        "Docker",
+        "GitHub Actions",
+        "CI/CD"
+      ]
+    },
+    {
+      "name": "emotional_frustrated",
+      "input": "This is the third time this week that the server has gone down and honestly I'm really frustrated because we keep saying we're going to fix it but nothing actually gets done.",
+      "ideal": "This is the third time this week that the server has gone down, and I'm really frustrated because we keep saying we're going to fix it but nothing actually gets done."
+    },
+    {
+      "name": "original_chirp_test",
+      "input": "We just swapped out clen 2.53b for Gemma for E2B. And immediately we were getting better results with lower inference time. Something that we were exploring is integrating a new feature for Cherp to automatically screenshot and process which type of application you are working. in that way it can write out the words that you are saying with the proper formatting so for example if you are in an email client then it will detect that and ensure that the formatted output is made for an email client because Gemma has multimodal capacity where it can see images. We were exploring if Gemma could be used for that application. And at what point in the pipeline would it make sense for that step to go of the detection of which program you're working in.",
+      "ideal": "We just swapped out Qwen 2.5 3B for Gemma 4 E2B and immediately got better results with lower inference time. We're exploring integrating a new feature for Chirp to automatically screenshot and detect which application the user is working in, so the output is formatted accordingly. For example, if you're in an email client, it formats the output for email. Since Gemma has multimodal capabilities including image understanding, we're evaluating whether it could handle this detection step and where in the pipeline it should go.",
+      "dict": [
+        "Chirp",
+        "Qwen",
+        "Gemma",
+        "Parakeet"
+      ]
+    }
+  ],
+  "results": {
+    "gemma": [
+      {
+        "test": "simple_clean",
+        "output": "The meeting is scheduled for Thursday at 3 pm in the main conference room.",
+        "latency": 0.159,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "fillers_basic",
+        "output": "I think we should move forward with the proposal.",
+        "latency": 0.104,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "self_correction",
+        "output": "Send the report to Mike by end of day.",
+        "latency": 0.125,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "stutters",
+        "output": "We need to update the documentation before the release.",
+        "latency": 0.121,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "technical_asr_errors",
+        "output": "The Kubernetes cluster is running on version 1.28, and we need to upgrade the ingress controller.",
+        "latency": 0.156,
+        "overlap": 0.875,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "repeated_ideas",
+        "output": "We need to fix the login page. Users can't log in, so the login is not working and we need to fix it as soon as possible.",
+        "latency": 0.199,
+        "overlap": 0.714,
+        "length_ratio": 0.714,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "long_complex",
+        "output": "We should probably restructure the entire frontend because right now it's a monolith, and every time someone makes a change, it breaks something else. Build times are getting really long, like fifteen minutes for a production build, which is too slow and killing our productivity.",
+        "latency": 0.293,
+        "overlap": 0.66,
+        "length_ratio": 0.977,
+        "issues": [
+          "filler:like"
+        ],
+        "issue_count": 1
+      },
+      {
+        "test": "numbers_stats",
+        "output": "Revenue increased by 23 percent last quarter, from 4.2 million to 5.1 million, and our customer base grew by about 15,000 users.",
+        "latency": 0.245,
+        "overlap": 0.64,
+        "length_ratio": 0.952,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "email_greeting",
+        "output": "Hi Sarah,\n\nI wanted to follow up on yesterday's meeting. Can you send me the updated budget by Friday?\n\nThanks,\nJohn",
+        "latency": 0.193,
+        "overlap": 0.909,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "multi_correction",
+        "output": "The deadline is Wednesday because of the holiday.",
+        "latency": 0.119,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "spoken_punctuation",
+        "output": "Please send the files to John at example dot com and cc the team.",
+        "latency": 0.141,
+        "overlap": 0.571,
+        "length_ratio": 0.6,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "short_quick",
+        "output": "Sounds good, let's do it.",
+        "latency": 0.116,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "mixed_fillers_corrections",
+        "output": "I was thinking we could use Vue because it's lighter and the team already knows it.",
+        "latency": 0.153,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "chirp_specific",
+        "output": "We just updated the Chirp app to use the Parakeet model for transcription, and it's working really well.",
+        "latency": 0.193,
+        "overlap": 0.889,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "list_dictation",
+        "output": "For the sprint, we need to do three things. First, fix the authentication bug. Second, update the API documentation. And third, deploy the new version to staging.",
+        "latency": 0.213,
+        "overlap": 0.917,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "casual_tone",
+        "output": "The client wants it done by next week, but I don't think that's realistic given where we are right now.",
+        "latency": 0.196,
+        "overlap": 0.952,
+        "length_ratio": 0.952,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "heavy_stutters",
+        "output": "The best approach is to first analyze the data and then make a decision based on what we find.",
+        "latency": 0.146,
+        "overlap": 0.773,
+        "length_ratio": 0.864,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "domain_technical",
+        "output": "The CI/CD pipeline is failing because the Docker image can't pull from the private registry. We need to update the credentials in the GitHub Actions secrets.",
+        "latency": 0.202,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "emotional_frustrated",
+        "output": "This is the third time this week the server has gone down, and I'm really frustrated because we keep saying we're going to fix it but nothing actually gets done.",
+        "latency": 0.216,
+        "overlap": 0.966,
+        "length_ratio": 0.968,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "original_chirp_test",
+        "output": "We swapped out clen 2.53b for Gemma for E2B and immediately got better results with lower inference time. We are exploring integrating a new feature for Chirp to automatically screenshot and process which type of application you are working in. This way, it can write out the words you are saying with the proper formatting. For example, if you are in an email client, it will detect that and ensure the formatted output is made for an email client because Gemma has multimodal capacity and can see images. We were exploring if Gemma could be used for that application and at what point in the pipeline it would make sense for the detection of which program you're working in to occur.",
+        "latency": 0.699,
+        "overlap": 0.438,
+        "length_ratio": 0.576,
+        "issues": [],
+        "issue_count": 0
+      }
+    ],
+    "qwen": [
+      {
+        "test": "simple_clean",
+        "output": "The meeting is scheduled for Thursday at 3 pm in the main conference room.",
+        "latency": 0.153,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "fillers_basic",
+        "output": "So I think we should basically you know move forward with the proposal.",
+        "latency": 0.129,
+        "overlap": 0.692,
+        "length_ratio": 0.556,
+        "issues": [
+          "filler:you know",
+          "filler:basically"
+        ],
+        "issue_count": 2
+      },
+      {
+        "test": "self_correction",
+        "output": "Send the report to Mike by end of day.",
+        "latency": 0.101,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "stutters",
+        "output": "We need to update the documentation before the release.",
+        "latency": 0.088,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "technical_asr_errors",
+        "output": "The Kubernetes cluster is running on version 1.28 and we need to upgrade the ingar controller.",
+        "latency": 0.155,
+        "overlap": 0.875,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "repeated_ideas",
+        "output": "We need to fix the login page. The login page is broken. Users can't log in. So basically the login is not working and we need to fix it as soon as possible.",
+        "latency": 0.242,
+        "overlap": 0.625,
+        "length_ratio": 0.429,
+        "issues": [
+          "filler:basically"
+        ],
+        "issue_count": 1
+      },
+      {
+        "test": "long_complex",
+        "output": "So what I'm thinking is that we should probably restructure the entire frontend because right now it's a monolith and every time someone makes a change it breaks something else and the build times are getting really long, like 15 minutes for a production build which is way too slow and it's killing our productivity.",
+        "latency": 0.331,
+        "overlap": 0.692,
+        "length_ratio": 0.75,
+        "issues": [
+          "filler:like"
+        ],
+        "issue_count": 1
+      },
+      {
+        "test": "numbers_stats",
+        "output": "Revenue increased by 23 percent last quarter from $4.2 million to $5.1 million, and our customer base grew by about 15,000 users.",
+        "latency": 0.227,
+        "overlap": 0.864,
+        "length_ratio": 0.952,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "email_greeting",
+        "output": "Hey Sarah^I wanted to follow up on yesterday's meeting. Can you send me the updated budget by Friday? Thanks John",
+        "latency": 0.185,
+        "overlap": 0.783,
+        "length_ratio": 0.952,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "multi_correction",
+        "output": "The deadline is Wednesday because of the holiday.",
+        "latency": 0.115,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "spoken_punctuation",
+        "output": "Please send the files to john at example dot com and cc the team.",
+        "latency": 0.125,
+        "overlap": 0.571,
+        "length_ratio": 0.6,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "short_quick",
+        "output": "Sounds good, let's do it.",
+        "latency": 0.108,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "mixed_fillers_corrections",
+        "output": "Um so I was thinking we could use Vue no actually it's lighter and the team already knows it.",
+        "latency": 0.149,
+        "overlap": 0.75,
+        "length_ratio": 0.812,
+        "issues": [
+          "filler:um"
+        ],
+        "issue_count": 1
+      },
+      {
+        "test": "chirp_specific",
+        "output": "We just updated the Cherp app to use the Parakeet model for transcription and it's working really well.",
+        "latency": 0.175,
+        "overlap": 0.889,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "list_dictation",
+        "output": "For the sprint, we need to do three things: first, fix the authentication bug, second, update the API documentation, and third, deploy the new version to staging.",
+        "latency": 0.228,
+        "overlap": 0.704,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "casual_tone",
+        "output": "Yeah, so the thing is the client wants it done by next week, but honestly, I don't think that's realistic given where we are right now.",
+        "latency": 0.211,
+        "overlap": 0.769,
+        "length_ratio": 0.762,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "heavy_stutters",
+        "output": "I think the best approach would be to first analyze the data and then make a decision based on what we find.",
+        "latency": 0.176,
+        "overlap": 1.0,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "domain_technical",
+        "output": "The CI/CD pipeline is failing because the docker image can't pull from the private registry we need to update the credentials in the github actions secrets.",
+        "latency": 0.2,
+        "overlap": 0.913,
+        "length_ratio": 1.0,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "emotional_frustrated",
+        "output": "This is the third time this week that the server has gone down, and honestly, I'm really frustrated because we keep saying we're going to fix it, but nothing actually gets done.",
+        "latency": 0.236,
+        "overlap": 0.903,
+        "length_ratio": 0.968,
+        "issues": [],
+        "issue_count": 0
+      },
+      {
+        "test": "original_chirp_test",
+        "output": "We just swapped out clench 2.53b for Gemma for E2B, and immediately we were getting better results with lower inference time. Something that we were exploring is integrating a new feature for Chirp to automatically screenshot and process which type of application you are working in, that way it can write out the words you are saying with proper formatting. For example, if you are in an email client, then it will detect that and ensure that the formatted output is made for an email client because Gemma has multimodal capacity where it can see images. We were exploring if Gemma could be used for that application, and at what point in the pipeline it would make sense for that step to go of the detection of which program you are working in.",
+        "latency": 0.767,
+        "overlap": 0.418,
+        "length_ratio": 0.435,
+        "issues": [],
+        "issue_count": 0
+      }
+    ]
+  }
+}

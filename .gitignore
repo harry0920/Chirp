@@ -39,6 +39,18 @@ training/venv/
 training/.venv/
 training/__pycache__/
 
+# Training model weights and intermediate data (downloaded/generated, not source)
+training/*.gguf
+training/*.zip
+training/data/ct2_models/
+training/data/hf-model/
+training/data/lard/
+training/data/lard-tool/
+training/data/onnx-model/
+training/data/onnx-model-quantized/
+training/data/tokenizer-fix/
+training/data/training_*.jsonl
+
 # GGUF model files (tracked via git-lfs, but ignore downloaded benchmark models)
 # The fine-tuned model is committed via LFS
 chirp-benchmark-models/
