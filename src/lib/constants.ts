@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS = {
   historyRetentionDays: 0,
   helpImprove: false,
   beamSearch: false,
-  cleanupModel: 'gemma' as string,
+  cleanupModel: 'chirp-v2' as string,
   darkMode: false,
 }
 
@@ -28,12 +28,12 @@ export const STT_MODELS = [
 ]
 
 export const LLM_MODEL = {
-  name: 'Gemma 4 E2B — Google',
+  name: 'Chirp Cleanup v2',
   displayName: 'Smart Cleanup',
-  size: '3.1 GB',
-  friendlySize: 'About 3 GB',
-  description: 'High-quality grammar and speech cleanup.',
-  attribution: 'Powered by Gemma 4 — Google',
+  size: '397 MB',
+  friendlySize: 'About 400 MB',
+  description: 'Fine-tuned grammar and speech cleanup model. Faster and more accurate than general-purpose LLMs.',
+  attribution: 'Built on Qwen3 0.6B — Alibaba (Apache 2.0)',
 }
 
 export const CLEANUP_EXAMPLE = {

@@ -197,7 +197,8 @@ pub fn run() {
                 let mut s = state.blocking_lock();
                 let model = s.settings.model.clone();
                 if transcribe::model_exists(&model) {
-                    match transcribe::load_model(&model, s.settings.beam_search) {
+                    let vocab = s.vocabulary.clone();
+                    match transcribe::load_model(&model, s.settings.beam_search, &vocab) {
                         Ok(recognizer) => {
                             s.recognizer = Some(Arc::new(recognizer));
                             log::info!("Speech model '{model}' loaded");
@@ -260,10 +261,10 @@ pub fn run() {
                                 }
                                 s.llm_process = Some(child);
                                 s.llm_port = Some(port);
-                                log::info!("Gemma server auto-started on port {port}");
+                                log::info!("Cleanup model server auto-started on port {port}");
                             }
                             Err(e) => {
-                                log::warn!("Failed to auto-start Gemma server: {e}");
+                                log::warn!("Failed to auto-start cleanup model server: {e}");
                             }
                         }
                     });

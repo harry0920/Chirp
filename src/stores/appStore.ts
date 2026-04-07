@@ -9,6 +9,17 @@ export interface SnippetEntry {
   expansion: string
 }
 
+/**
+ * A vocabulary entry: a canonical term plus optional list of mishearings
+ * to find/replace toward this term. `term` drives ASR-side hotword biasing
+ * (sherpa-onnx); `replaces` drives the post-ASR find/replace pass for
+ * homophones and stable mishearings the ASR can't fix on its own.
+ */
+export interface VocabEntry {
+  term: string
+  replaces: string[]
+}
+
 export interface TranscriptionEntry {
   text: string
   timestamp: string
@@ -51,7 +62,7 @@ export interface AppState {
   llmDownloadProgress: number | null
 
   // Vocabulary
-  vocabulary: string[]
+  vocabulary: VocabEntry[]
 
   // Snippets
   snippets: SnippetEntry[]
@@ -88,7 +99,7 @@ export interface AppState {
   // About modal
   aboutModalOpen: boolean
 
-  // Upgrade modal (shown when user needs new Gemma model)
+  // Upgrade modal (shown when user needs the new cleanup model)
   upgradeModalOpen: boolean
 
   // Update availability
@@ -110,9 +121,10 @@ export interface AppState {
   setLlmDownloadProgress: (progress: number | null) => void
   setLlmReady: (ready: boolean) => void
   updateSettings: (partial: Partial<AppState>) => void
-  addVocabularyWord: (word: string) => void
-  removeVocabularyWord: (index: number) => void
-  setVocabulary: (vocabulary: string[]) => void
+  addVocabularyEntry: (term: string) => void
+  updateVocabularyEntry: (index: number, entry: VocabEntry) => void
+  removeVocabularyEntry: (index: number) => void
+  setVocabulary: (vocabulary: VocabEntry[]) => void
   setSnippets: (snippets: SnippetEntry[]) => void
   addSnippet: (trigger: string, expansion: string) => void
   updateSnippet: (index: number, trigger: string, expansion: string) => void
@@ -220,9 +232,15 @@ export const useAppStore = create<AppState>((set) => ({
   setLlmDownloadProgress: (llmDownloadProgress) => set({ llmDownloadProgress }),
   setLlmReady: (llmReady) => set({ llmReady }),
   updateSettings: (partial) => set(partial),
-  addVocabularyWord: (word) =>
-    set((state) => ({ vocabulary: [...state.vocabulary, word] })),
-  removeVocabularyWord: (index) =>
+  addVocabularyEntry: (term) =>
+    set((state) => ({
+      vocabulary: [...state.vocabulary, { term, replaces: [] }],
+    })),
+  updateVocabularyEntry: (index, entry) =>
+    set((state) => ({
+      vocabulary: state.vocabulary.map((e, i) => (i === index ? entry : e)),
+    })),
+  removeVocabularyEntry: (index) =>
     set((state) => ({ vocabulary: state.vocabulary.filter((_, i) => i !== index) })),
   setVocabulary: (vocabulary) => set({ vocabulary }),
   setSnippets: (snippets) => set({ snippets }),

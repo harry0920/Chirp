@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from '../stores/appStore'
-import type { TranscriptionEntry } from '../stores/appStore'
+import type { TranscriptionEntry, VocabEntry } from '../stores/appStore'
 import { useTauri } from './useTauri'
 
 // Settings keys that should be synced to the backend
@@ -53,9 +53,9 @@ export function useSettingsSync() {
       useAppStore.getState().setHistory(entries)
     }).catch((e) => console.error('Failed to load history:', e))
 
-    // Load vocabulary
-    invoke('get_vocabulary').then((words) => {
-      useAppStore.getState().setVocabulary(words as string[])
+    // Load vocabulary (typed as VocabEntry[] from the backend)
+    invoke('get_vocabulary').then((entries) => {
+      useAppStore.getState().setVocabulary(entries as VocabEntry[])
     }).catch((e) => console.error('Failed to load vocabulary:', e))
 
     // Load snippets
@@ -143,7 +143,7 @@ export function useSettingsSync() {
 
       // Sync vocabulary changes
       if (state.vocabulary !== prevState.vocabulary) {
-        invoke('update_vocabulary', { words: state.vocabulary }).then(() => {
+        invoke('update_vocabulary', { entries: state.vocabulary }).then(() => {
           useAppStore.getState().setSettingsSaved(true)
         }).catch((e) => console.error('Failed to sync vocabulary:', e))
       }

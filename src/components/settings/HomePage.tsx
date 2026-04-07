@@ -96,7 +96,7 @@ export function HomePage() {
   const handleQuickAddVocab = () => {
     const word = qaWord.trim()
     if (!word) return
-    store.addVocabularyWord(word)
+    store.addVocabularyEntry(word)
     setQaWord('')
     setQaAdded(true)
     setTimeout(() => setQaAdded(false), 1200)

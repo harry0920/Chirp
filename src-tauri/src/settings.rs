@@ -73,21 +73,32 @@ fn vocabulary_path() -> PathBuf {
     config_dir().join("vocabulary.json")
 }
 
-/// Remove old model files from previous versions (Qwen GGUF, chirp-cleanup T5)
+/// Remove old cleanup-model files from previous versions:
+///   - Qwen 2.5 3B GGUF (pre-Gemma)
+///   - FLAN-T5 chirp-cleanup directory (pre-Gemma)
+///   - Gemma 4 E2B GGUF (replaced by chirp-cleanup-v2 in v1.3.0)
 fn cleanup_old_models() {
     let llm_dir = config_dir().join("llm");
-    let qwen_path = llm_dir.join("qwen2.5-3b-instruct-q4_k_m.gguf");
-    if qwen_path.exists() {
-        match std::fs::remove_file(&qwen_path) {
-            Ok(_) => log::info!("Cleaned up old Qwen model ({})", qwen_path.display()),
-            Err(e) => log::warn!("Failed to remove old Qwen model: {e}"),
+
+    let old_files = [
+        "qwen2.5-3b-instruct-q4_k_m.gguf",
+        "gemma-4-e2b-it-q4_k_m.gguf",
+        "gemma-4-E2B-it-Q4_K_M.gguf",
+    ];
+    for name in old_files {
+        let path = llm_dir.join(name);
+        if path.exists() {
+            match std::fs::remove_file(&path) {
+                Ok(_) => log::info!("Cleaned up old cleanup model ({})", path.display()),
+                Err(e) => log::warn!("Failed to remove {name}: {e}"),
+            }
         }
     }
 
     let chirp_cleanup_dir = config_dir().join("chirp-cleanup");
     if chirp_cleanup_dir.exists() {
         match std::fs::remove_dir_all(&chirp_cleanup_dir) {
-            Ok(_) => log::info!("Cleaned up old chirp-cleanup model dir"),
+            Ok(_) => log::info!("Cleaned up old chirp-cleanup T5 dir"),
             Err(e) => log::warn!("Failed to remove chirp-cleanup dir: {e}"),
         }
     }
@@ -112,10 +123,10 @@ pub fn load_settings() -> Settings {
         _ => {}
     }
 
-    // Migrate old cleanup model to Gemma
-    if settings.cleanup_model != "gemma" {
-        log::info!("Migrated cleanup_model '{}' → 'gemma'", settings.cleanup_model);
-        settings.cleanup_model = "gemma".into();
+    // Migrate old cleanup model to chirp-cleanup-v2 (fine-tuned Qwen3 0.6B)
+    if settings.cleanup_model != "chirp-v2" {
+        log::info!("Migrated cleanup_model '{}' → 'chirp-v2'", settings.cleanup_model);
+        settings.cleanup_model = "chirp-v2".into();
     }
 
     // Clean up old model files (Qwen, chirp-cleanup) in background
@@ -141,33 +152,58 @@ pub fn save_settings(settings: &Settings) -> Result<(), String> {
     std::fs::write(settings_path(), data).map_err(|e| format!("Failed to write settings: {e}"))
 }
 
-/// Load vocabulary from disk
-pub fn load_vocabulary() -> Vec<String> {
+/// Load vocabulary from disk.
+///
+/// Accepts both shapes via `VocabEntryWire`:
+///   - Legacy: `["Pieter", "Akilan", ...]`  → widened to entries with empty replaces
+///   - New:    `[{"term": "Pieter", "replaces": ["Peter"]}, ...]`
+///
+/// Also migrates from the much older `dictionary.json` (from→to entries) when
+/// `vocabulary.json` is missing or empty. The legacy dictionary's `from`
+/// field is used as a `replaces` entry — that's actually the EXACT semantics
+/// the user originally wanted, and now we have the schema to express it.
+pub fn load_vocabulary() -> Vec<crate::state::VocabEntry> {
+    use crate::state::{VocabEntry, VocabEntryWire};
+
     let path = vocabulary_path();
-    match std::fs::read_to_string(&path) {
-        Ok(data) => serde_json::from_str(&data).unwrap_or_else(|e| {
-            log::warn!("Corrupted vocabulary JSON, resetting: {e}");
-            Vec::new()
-        }),
-        Err(_) => {
-            // Migrate from old dictionary.json if it exists
-            let old_path = config_dir().join("dictionary.json");
-            if let Ok(old_data) = std::fs::read_to_string(&old_path) {
-                #[derive(serde::Deserialize)]
-                struct OldEntry { #[allow(dead_code)] from: String, to: String }
-                if let Ok(entries) = serde_json::from_str::<Vec<OldEntry>>(&old_data) {
-                    let vocab: Vec<String> = entries.into_iter().map(|e| e.to).collect();
-                    if !vocab.is_empty() {
-                        log::info!("Migrated {} dictionary entries to vocabulary", vocab.len());
-                        let _ = save_vocabulary(&vocab);
-                        let _ = std::fs::remove_file(&old_path);
-                        return vocab;
-                    }
-                }
+    let existing: Vec<VocabEntry> = match std::fs::read_to_string(&path) {
+        Ok(data) => match serde_json::from_str::<Vec<VocabEntryWire>>(&data) {
+            Ok(wires) => wires.into_iter().map(VocabEntry::from).collect(),
+            Err(e) => {
+                log::warn!("Corrupted vocabulary JSON, resetting: {e}");
+                Vec::new()
             }
-            Vec::new()
+        },
+        Err(_) => Vec::new(),
+    };
+
+    if !existing.is_empty() {
+        return existing;
+    }
+
+    // vocabulary.json is missing or empty — try to recover from legacy dictionary.json
+    let old_path = config_dir().join("dictionary.json");
+    if let Ok(old_data) = std::fs::read_to_string(&old_path) {
+        #[derive(serde::Deserialize)]
+        struct OldEntry { from: String, to: String }
+        if let Ok(entries) = serde_json::from_str::<Vec<OldEntry>>(&old_data) {
+            let vocab: Vec<VocabEntry> = entries
+                .into_iter()
+                .map(|e| VocabEntry { term: e.to, replaces: vec![e.from] })
+                .collect();
+            if !vocab.is_empty() {
+                log::info!(
+                    "Migrated {} legacy dictionary entries to vocabulary (with replaces preserved)",
+                    vocab.len()
+                );
+                let _ = save_vocabulary(&vocab);
+                let _ = std::fs::remove_file(&old_path);
+                return vocab;
+            }
         }
     }
+
+    Vec::new()
 }
 
 fn snippets_path() -> PathBuf {
@@ -263,11 +299,11 @@ pub async fn download_vad_model() -> Result<(), String> {
     Ok(())
 }
 
-/// Save vocabulary to disk
-pub fn save_vocabulary(words: &[String]) -> Result<(), String> {
+/// Save vocabulary to disk in the new VocabEntry shape.
+pub fn save_vocabulary(entries: &[crate::state::VocabEntry]) -> Result<(), String> {
     let dir = config_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create config dir: {e}"))?;
-    let data = serde_json::to_string_pretty(words)
+    let data = serde_json::to_string_pretty(entries)
         .map_err(|e| format!("Failed to serialize: {e}"))?;
     std::fs::write(vocabulary_path(), data)
         .map_err(|e| format!("Failed to write vocabulary: {e}"))

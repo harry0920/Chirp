@@ -1,10 +1,11 @@
 use regex::Regex;
 use std::sync::OnceLock;
 
+use crate::state::VocabEntry;
+
 /// Pre-compiled regex patterns for text cleanup
 struct CleanupRegexes {
     fillers: Vec<Regex>,
-    correction: Regex,
     dangling_comma: Regex,
     leading_comma: Regex,
     whitespace: Regex,
@@ -99,9 +100,6 @@ fn regexes() -> &'static CleanupRegexes {
                 .iter()
                 .filter_map(|p| Regex::new(p).ok())
                 .collect(),
-            correction: Regex::new(
-                r"(?i).*\b(?:wait(?:\s+no)?|no\s+wait|oh\s+wait|actually\s+(?:wait|no)|(?:oh\s+)?no\s+(?:actually|i\s+mean[st]?)|(?:wait\s+)?i\s+mean[st]?|or\s+(?:rather|actually)|scratch\s+that|never\s*mind|sorry)\s*,?\s*"
-            ).unwrap(),
             dangling_comma: Regex::new(r",\s*,").unwrap(),
             leading_comma: Regex::new(r"^\s*,\s*").unwrap(),
             whitespace: Regex::new(r"\s{2,}").unwrap(),
@@ -120,7 +118,14 @@ fn regexes() -> &'static CleanupRegexes {
     })
 }
 
-/// Full cleanup pipeline: filler removal → self-correction → regex formatting
+/// Full cleanup pipeline: filler removal → capitalization → regex formatting.
+///
+/// Self-correction handling is now performed by the LLM cleanup pass
+/// (chirp-cleanup-v2), which is fine-tuned for it and applies semantic
+/// context. The previous regex-based `strip_corrections` step was removed
+/// because its `.*` greedy match across sentence boundaries silently deleted
+/// large portions of dictations whenever a discourse filler like "I mean" /
+/// "actually" / "sorry" appeared mid-monologue.
 pub fn cleanup_text(text: &str, smart_formatting: bool) -> String {
     if text.is_empty() {
         return String::new();
@@ -132,14 +137,11 @@ pub fn cleanup_text(text: &str, smart_formatting: bool) -> String {
 
     // Remove fillers (um, uh, filler "like", etc.)
     let result = remove_fillers(text);
-
-    // Strip self-corrections ("wait no", "I mean", "scratch that")
-    let result = strip_corrections(&result);
     if result.is_empty() {
         return String::new();
     }
 
-    // Capitalize first letter after correction stripping
+    // Capitalize first letter (filler removal may have stripped a leading "Um,")
     let result = capitalize_first(&result);
 
     // Regex-based formatting (spoken punctuation, numbers, etc.)
@@ -159,19 +161,6 @@ fn remove_fillers(text: &str) -> String {
     result = re.dangling_comma.replace_all(&result, ",").to_string();
     result = re.leading_comma.replace(&result, "").to_string();
     re.whitespace.replace_all(result.trim(), " ").to_string()
-}
-
-/// Strip everything before a self-correction signal, keeping only the final intent.
-/// "let's meet at 3 oh wait let's meet at 2" → "let's meet at 2"
-fn strip_corrections(text: &str) -> String {
-    let re = regexes();
-    let result = re.correction.replace(text, "").to_string();
-    let trimmed = result.trim();
-    if trimmed.is_empty() {
-        // Correction signal ate everything (e.g. "scratch that") — return empty
-        return String::new();
-    }
-    trimmed.to_string()
 }
 
 /// Capitalize the first character of a string
@@ -260,6 +249,73 @@ fn format_spoken_patterns(text: &str) -> String {
     result
 }
 
+/// Apply user-configured find/replace from the vocabulary's `replaces` lists.
+///
+/// For each VocabEntry, every string in `replaces` is matched
+/// case-insensitively at word boundaries and substituted with the canonical
+/// `term`. This is the deterministic post-ASR fixup layer for things sherpa
+/// hotword biasing can't fix — homophones (Pieter/Peter), brand spellings,
+/// stable mishearings.
+///
+/// Runs BEFORE the LLM cleanup pass so the LLM sees the corrected names in
+/// context. chirp-cleanup-v2 at temp 0.0 won't reintroduce alternative
+/// spellings the input doesn't contain.
+///
+/// Edge cases:
+///   - Self-replacements (case-insensitive `from == to`) are skipped
+///   - Empty / whitespace-only `from` strings are skipped
+///   - `from` strings are `regex::escape`'d, so literal special chars are safe
+///   - Match is case-insensitive; replacement always uses the canonical case
+pub fn apply_replacements(text: &str, vocabulary: &[VocabEntry]) -> String {
+    let mut result = text.to_string();
+    for entry in vocabulary {
+        let canonical = entry.term.trim();
+        if canonical.is_empty() {
+            continue;
+        }
+        for from in &entry.replaces {
+            let from_trim = from.trim();
+            if from_trim.is_empty() {
+                continue;
+            }
+            if from_trim.eq_ignore_ascii_case(canonical) {
+                continue;
+            }
+            // Build a case-insensitive regex for the literal `from`. `\b` only
+            // matches at the transition between a word and non-word char, so
+            // we only anchor with `\b` on sides where the pattern's edge IS a
+            // word character. Otherwise the boundary assertion would fail
+            // (e.g. `\bco (corp)\b` — the trailing `)` is non-word, the
+            // following space is also non-word, so no boundary exists there).
+            let starts_with_word = from_trim
+                .chars()
+                .next()
+                .map(|c| c.is_alphanumeric() || c == '_')
+                .unwrap_or(false);
+            let ends_with_word = from_trim
+                .chars()
+                .last()
+                .map(|c| c.is_alphanumeric() || c == '_')
+                .unwrap_or(false);
+            let pattern = format!(
+                "(?i){}{}{}",
+                if starts_with_word { r"\b" } else { "" },
+                regex::escape(from_trim),
+                if ends_with_word { r"\b" } else { "" },
+            );
+            match Regex::new(&pattern) {
+                Ok(re) => {
+                    result = re.replace_all(&result, canonical).to_string();
+                }
+                Err(e) => {
+                    log::warn!("Failed to compile replacement pattern '{from_trim}': {e}");
+                }
+            }
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,5 +349,75 @@ mod tests {
     fn test_full_cleanup() {
         let result = cleanup_text("send an email to bob at test dot com", true);
         assert!(result.contains("bob@test.com"));
+    }
+
+    fn vocab(entries: &[(&str, &[&str])]) -> Vec<VocabEntry> {
+        entries
+            .iter()
+            .map(|(term, replaces)| VocabEntry {
+                term: (*term).to_string(),
+                replaces: replaces.iter().map(|s| (*s).to_string()).collect(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_apply_replacements_basic() {
+        let v = vocab(&[("Pieter", &["Peter"])]);
+        assert_eq!(apply_replacements("My name is Peter.", &v), "My name is Pieter.");
+    }
+
+    #[test]
+    fn test_apply_replacements_case_insensitive() {
+        let v = vocab(&[("Pieter", &["Peter"])]);
+        assert_eq!(apply_replacements("PETER and peter", &v), "Pieter and Pieter");
+    }
+
+    #[test]
+    fn test_apply_replacements_word_boundary() {
+        // "petersburg" should NOT become "pietersburg"
+        let v = vocab(&[("Pieter", &["Peter"])]);
+        assert_eq!(apply_replacements("I went to Petersburg.", &v), "I went to Petersburg.");
+    }
+
+    #[test]
+    fn test_apply_replacements_apostrophe() {
+        // "Peter's" should become "Pieter's" — \b matches between r and '
+        let v = vocab(&[("Pieter", &["Peter"])]);
+        assert_eq!(apply_replacements("Peter's car.", &v), "Pieter's car.");
+    }
+
+    #[test]
+    fn test_apply_replacements_multiple_froms() {
+        let v = vocab(&[("Lakshamanan", &["Lakshmanan", "lock shamanan"])]);
+        assert_eq!(
+            apply_replacements("Hi Lakshmanan and lock shamanan", &v),
+            "Hi Lakshamanan and Lakshamanan"
+        );
+    }
+
+    #[test]
+    fn test_apply_replacements_self_replacement_skipped() {
+        // Replacing "Peter" with "Peter" should be a no-op (no infinite loop)
+        let v = vocab(&[("Peter", &["peter", "Peter", "PETER"])]);
+        // All three case-insensitively equal to canonical → all skipped
+        assert_eq!(apply_replacements("hello peter", &v), "hello peter");
+    }
+
+    #[test]
+    fn test_apply_replacements_empty_replaces() {
+        // Term with no replaces does nothing — purely for ASR biasing
+        let v = vocab(&[("Akilan", &[])]);
+        assert_eq!(apply_replacements("hello world", &v), "hello world");
+    }
+
+    #[test]
+    fn test_apply_replacements_special_chars_in_from() {
+        // regex::escape handles parens, dots, etc. in the `from` string
+        let v = vocab(&[("Co.", &["co (corp)"])]);
+        assert_eq!(
+            apply_replacements("the co (corp) released a product", &v),
+            "the Co. released a product"
+        );
     }
 }

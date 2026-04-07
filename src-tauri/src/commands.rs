@@ -183,8 +183,9 @@ pub async fn update_settings(
     if partial.get("beamSearch").is_some() || partial.get("beam_search").is_some() {
         let model = s.settings.model.clone();
         let beam_search = s.settings.beam_search;
+        let vocab = s.vocabulary.clone();
         if transcribe::model_exists(&model) {
-            match transcribe::load_model(&model, beam_search) {
+            match transcribe::load_model(&model, beam_search, &vocab) {
                 Ok(recognizer) => {
                     s.recognizer = Some(Arc::new(recognizer));
                     log::info!("Recognizer rebuilt (beam_search={beam_search})");
@@ -193,7 +194,7 @@ pub async fn update_settings(
                     log::error!("Failed to rebuild recognizer: {e}");
                     // Fallback to greedy
                     if beam_search {
-                        if let Ok(recognizer) = transcribe::load_model(&model, false) {
+                        if let Ok(recognizer) = transcribe::load_model(&model, false, &vocab) {
                             s.recognizer = Some(Arc::new(recognizer));
                             log::info!("Recognizer rebuilt with greedy search (fallback)");
                         }
@@ -225,22 +226,53 @@ pub async fn update_settings(
 }
 
 #[tauri::command]
-pub async fn get_vocabulary(state: State<'_, SharedState>) -> Result<Vec<String>, String> {
+pub async fn get_vocabulary(state: State<'_, SharedState>) -> Result<Vec<crate::state::VocabEntry>, String> {
     let s = state.lock().await;
     Ok(s.vocabulary.clone())
 }
 
 #[tauri::command]
 pub async fn update_vocabulary(
-    words: Vec<String>,
+    entries: Vec<crate::state::VocabEntry>,
     state: State<'_, SharedState>,
 ) -> Result<(), String> {
-    if words.len() > 500 {
-        return Err("Vocabulary cannot exceed 500 words".to_string());
+    if entries.len() > 500 {
+        return Err("Vocabulary cannot exceed 500 entries".to_string());
     }
     let mut s = state.lock().await;
-    s.vocabulary = words.clone();
+
+    // Compare the OLD term list to the NEW term list. The recognizer's
+    // hotwords automaton is built from `term` only — it does not depend on
+    // `replaces`. So if the user edited only `replaces` lists (the common
+    // case while building up the find/replace dictionary), we should NOT
+    // mark the recognizer dirty, because rebuilding the recognizer
+    // unnecessarily across many edits has been observed to cause sherpa-onnx
+    // heap corruption (STATUS_HEAP_CORRUPTION 0xc0000374).
+    //
+    // The post-ASR find/replace pass (cleanup::apply_replacements) reads
+    // s.vocabulary live each call, so replaces edits take effect on the very
+    // next dictation regardless of dirty flag — no rebuild required.
+    let old_terms: Vec<&str> = s.vocabulary.iter().map(|e| e.term.as_str()).collect();
+    let new_terms: Vec<&str> = entries.iter().map(|e| e.term.as_str()).collect();
+    let terms_changed = old_terms != new_terms;
+
+    s.vocabulary = entries;
     settings::save_vocabulary(&s.vocabulary)?;
+
+    if terms_changed {
+        // Term list actually changed — recognizer needs rebuild for hotwords
+        // automaton to reflect the new canonical terms. Lazy rebuild happens
+        // at the end of the next stop_recording (NOT inline here, to prevent
+        // rapid create/destroy churn under settings-sync echo).
+        s.recognizer_dirty = true;
+        log::info!(
+            "Vocabulary terms changed ({} entries) — recognizer marked for rebuild",
+            s.vocabulary.len()
+        );
+    }
+    // else: only `replaces` lists changed — find/replace will pick them up
+    // automatically on the next dictation, no rebuild needed.
+
     Ok(())
 }
 
@@ -307,6 +339,15 @@ pub async fn start_recording(
     if s.recognizer.is_none() {
         return Err("model_not_loaded".into());
     }
+
+    // NOTE: vocab-dirty rebuild does NOT happen here. Rebuilding the
+    // recognizer takes ~3 seconds (loads onnx files), and doing that inside
+    // start_recording blocks audio capture until it completes — the user
+    // presses the hotkey, sees nothing for 3 seconds, releases, and the
+    // recording is empty. The rebuild instead happens at the END of
+    // stop_recording so the first dictation after a vocab edit uses stale
+    // hotwords (one cycle of staleness — acceptable) but recording-start is
+    // never blocked.
 
     // Deactivate any zombie callbacks from a previous stream before clearing the buffer.
     // On macOS, cpal/CoreAudio callbacks can outlive the Stream drop.
@@ -654,10 +695,16 @@ pub async fn stop_recording(
         // Regex pre-pass: remove fillers, spoken punctuation, format numbers
         let formatted = cleanup::cleanup_text(&raw, smart_fmt);
 
-        // Apply snippet expansions BEFORE AI cleanup
-        let after_snips = snippets::apply_snippets(&formatted, &snips);
+        // Vocabulary find/replace: deterministic post-ASR fixup for things
+        // hotword biasing can't fix (homophones, brand spellings, stable
+        // mishearings). Each VocabEntry's `replaces` list maps mishearings
+        // to its canonical `term`, case-insensitive at word boundaries.
+        let after_replace = cleanup::apply_replacements(&formatted, &vocab);
 
-        log::info!("After regex+snips: '{after_snips}'");
+        // Apply snippet expansions BEFORE AI cleanup
+        let after_snips = snippets::apply_snippets(&after_replace, &snips);
+
+        log::info!("After regex+replace+snips: '{after_snips}'");
         Ok(after_snips)
     })
     .await
@@ -678,8 +725,8 @@ pub async fn stop_recording(
     let after_llm = if ai_cleanup && llm_port.is_some() {
         let port = llm_port.unwrap();
         let _ = app_handle.emit("recording-state", "polishing");
-        log::info!("Running Gemma cleanup on text...");
-        let cleanup_result = llm::cleanup_text(port, &formatted, &tone_mode, &vocab, &http_client).await;
+        log::info!("Running chirp-cleanup-v2 on text...");
+        let cleanup_result = llm::cleanup_text(port, &formatted, &tone_mode, &http_client).await;
         match cleanup_result {
             Ok(cleaned) => {
                 log::info!("LLM cleanup: '{cleaned}'");
@@ -744,6 +791,68 @@ pub async fn stop_recording(
     let _ = history::save_history(&s.history);
     let new_entry = s.history.last().cloned();
     s.recording_state = RecordingState::Idle;
+
+    // If vocabulary terms changed since the last recording, rebuild the
+    // recognizer NOW that the user has their text and we're back in Idle.
+    // Doing this here instead of in start_recording avoids blocking the next
+    // hotkey press for the ~3 second model load time.
+    //
+    // The rebuild is wrapped in catch_unwind so a sherpa-onnx C-side panic
+    // produces an error log instead of killing the process. The recognizer
+    // would then stay stale (old vocab) but the app keeps running.
+    if s.recognizer_dirty {
+        // Drop the old Arc BEFORE building the new recognizer. Any concurrent
+        // user of the old recognizer (VAD receiver thread, in-flight transcribe)
+        // already finished above. Forcing the Drop now means sherpa-onnx's
+        // SherpaOnnxDestroyOfflineRecognizer runs synchronously, before we
+        // allocate the next hotword automaton — minimizing the window where
+        // both old and new recognizers exist simultaneously, which is the
+        // configuration that empirically triggered heap corruption.
+        s.recognizer = None;
+
+        let model = s.settings.model.clone();
+        let beam_search = s.settings.beam_search;
+        let vocab = s.vocabulary.clone();
+        if transcribe::model_exists(&model) {
+            let load_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                transcribe::load_model(&model, beam_search, &vocab)
+            }));
+            match load_result {
+                Ok(Ok(rec)) => {
+                    s.recognizer = Some(Arc::new(rec));
+                    s.recognizer_dirty = false;
+                    log::info!(
+                        "Recognizer rebuilt post-recording with {} vocabulary terms",
+                        vocab.len()
+                    );
+                }
+                Ok(Err(e)) => {
+                    log::error!("Failed to rebuild recognizer post-recording: {e}");
+                    // Try to fall back to a no-vocab recognizer so dictation
+                    // still works, just without hotword biasing.
+                    if let Ok(rec) = transcribe::load_model(&model, beam_search, &[]) {
+                        s.recognizer = Some(Arc::new(rec));
+                        log::warn!("Fell back to recognizer without hotwords");
+                    }
+                    s.recognizer_dirty = false;
+                }
+                Err(panic) => {
+                    let msg = panic
+                        .downcast_ref::<&str>()
+                        .map(|s| s.to_string())
+                        .or_else(|| panic.downcast_ref::<String>().cloned())
+                        .unwrap_or_else(|| "<unknown>".to_string());
+                    log::error!(
+                        "sherpa-onnx PANICKED during recognizer rebuild: {msg} — falling back to no-vocab recognizer"
+                    );
+                    if let Ok(rec) = transcribe::load_model(&model, beam_search, &[]) {
+                        s.recognizer = Some(Arc::new(rec));
+                    }
+                    s.recognizer_dirty = false;
+                }
+            }
+        }
+    }
 
     // Track dictation_completed telemetry (no-op if help_improve is off)
     {
@@ -839,7 +948,8 @@ pub async fn download_model(
     // Load the recognizer into app state immediately so recording works
     // without requiring a restart.
     let mut s = state.lock().await;
-    let recognizer = transcribe::load_model(&model, s.settings.beam_search)
+    let vocab = s.vocabulary.clone();
+    let recognizer = transcribe::load_model(&model, s.settings.beam_search, &vocab)
         .map_err(|e| format!("Model downloaded but failed to load: {e}"))?;
     s.recognizer = Some(Arc::new(recognizer));
     log::info!("Recognizer loaded after model download");
@@ -1007,7 +1117,7 @@ pub async fn test_llm_cleanup(
             s.http_client.clone(),
         )
     };
-    llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string()), &[], &http_client).await
+    llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string()), &http_client).await
 }
 
 #[tauri::command]

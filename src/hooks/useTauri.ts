@@ -7,7 +7,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
-import type { TranscriptionEntry } from '../stores/appStore'
+import type { TranscriptionEntry, VocabEntry } from '../stores/appStore'
 
 export interface AudioDevice {
   name: string
@@ -90,9 +90,9 @@ function createTauriApi() {
   }
 
   const updateVocabulary = async (
-    words: string[]
+    entries: VocabEntry[]
   ): Promise<void> => {
-    await invoke('update_vocabulary', { words })
+    await invoke('update_vocabulary', { entries })
   }
 
   const getHistory = async (): Promise<TranscriptionEntry[]> => {

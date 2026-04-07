@@ -76,14 +76,14 @@ export function UpgradeModal() {
         <div className="px-8 pb-8">
           <div className="flex flex-col items-center text-center">
             <p className="font-body text-[14px] text-dm-muted leading-relaxed">
-              We've upgraded to Google's latest
-              {' '}<span className="font-semibold text-dm-primary">Gemma 4 E2B</span> model
-              for better grammar, smarter corrections,
-              and vocabulary-aware cleanup.
+              We've upgraded to our own
+              {' '}<span className="font-semibold text-dm-primary">Chirp Cleanup v2</span> model —
+              fine-tuned specifically for dictation, faster, smaller,
+              and more accurate than general-purpose LLMs.
             </p>
 
             <p className="mt-6 font-body text-[12px] text-dm-secondary">
-              One-time download · About 3 GB · 100% on-device
+              One-time download · About 400 MB · 100% on-device
             </p>
 
             {/* Progress bar */}

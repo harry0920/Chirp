@@ -65,7 +65,7 @@ pub struct Settings {
 }
 
 fn default_cleanup_model() -> String {
-    "gemma".into()
+    "chirp-v2".into()
 }
 
 fn default_overlay_position() -> String {
@@ -98,7 +98,7 @@ impl Default for Settings {
             history_retention_days: 0,
             help_improve: false,
             beam_search: false,
-            cleanup_model: "gemma".into(),
+            cleanup_model: "chirp-v2".into(),
             dark_mode: false,
         }
     }
@@ -109,6 +109,41 @@ impl Default for Settings {
 pub struct SnippetEntry {
     pub trigger: String,
     pub expansion: String,
+}
+
+/// A vocabulary entry: a canonical term plus optional list of mishearings
+/// to find/replace toward this term.
+///
+/// `term` is what the ASR is biased toward (sherpa-onnx hotwords) and what
+/// every `replaces` entry is corrected TO during the post-ASR find/replace
+/// pass. The `replaces` list is purely for deterministic text substitution
+/// — it never touches the ASR or LLM.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VocabEntry {
+    pub term: String,
+    #[serde(default)]
+    pub replaces: Vec<String>,
+}
+
+/// Wire format that accepts BOTH the legacy Vec<String> shape and the new
+/// Vec<VocabEntry> shape, so existing vocabulary.json files keep loading
+/// without any migration. Strings get widened to VocabEntry { term, replaces: [] }.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum VocabEntryWire {
+    /// Legacy: just a canonical term, no replacements.
+    Bare(String),
+    /// New: canonical term plus optional list of mishearings.
+    Full(VocabEntry),
+}
+
+impl From<VocabEntryWire> for VocabEntry {
+    fn from(w: VocabEntryWire) -> Self {
+        match w {
+            VocabEntryWire::Bare(term) => VocabEntry { term, replaces: Vec::new() },
+            VocabEntryWire::Full(e) => e,
+        }
+    }
 }
 
 /// Audio device info sent to frontend
@@ -161,7 +196,7 @@ pub struct AmplitudeData {
 /// Main application state shared across commands
 pub struct AppState {
     pub settings: Settings,
-    pub vocabulary: Vec<String>,
+    pub vocabulary: Vec<VocabEntry>,
     pub snippets: Vec<SnippetEntry>,
     pub history: Vec<TranscriptionEntry>,
     pub recording_state: RecordingState,
@@ -170,6 +205,12 @@ pub struct AppState {
     /// Recognizer is in its own Arc so transcription can proceed without holding
     /// the main state lock. The sherpa C API is thread-safe (Send+Sync).
     pub recognizer: Option<Arc<SherpaRecognizer>>,
+    /// Set when the user updates vocabulary. The recognizer is rebuilt lazily
+    /// at the start of the next idle recording, NOT inline in update_vocabulary.
+    /// Inline rebuilds caused heap corruption when the frontend fired multiple
+    /// rapid update_vocabulary calls — sherpa-onnx can't handle rapid
+    /// create/destroy of hotword-enabled recognizers.
+    pub recognizer_dirty: bool,
     pub llm_process: Option<tokio::process::Child>,
     pub llm_port: Option<u16>,
     /// Shared HTTP client for LLM/T5 requests (connection pooling)
@@ -177,7 +218,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(settings: Settings, vocabulary: Vec<String>, snippets: Vec<SnippetEntry>, history: Vec<TranscriptionEntry>) -> Self {
+    pub fn new(settings: Settings, vocabulary: Vec<VocabEntry>, snippets: Vec<SnippetEntry>, history: Vec<TranscriptionEntry>) -> Self {
         Self {
             settings,
             vocabulary,
@@ -187,6 +228,7 @@ impl AppState {
             recording_generation: 0,
             hotkey_status: HotkeyStatus::Idle,
             recognizer: None,
+            recognizer_dirty: false,
             llm_process: None,
             llm_port: None,
             http_client: reqwest::Client::builder()

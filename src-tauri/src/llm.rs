@@ -117,63 +117,15 @@ fn extract_binary_archive(archive_path: &Path, dest_dir: &Path, is_targz: bool) 
     Ok(())
 }
 
-const BASE_SYSTEM_PROMPT: &str = "\
-You clean up speech-to-text output. Make it read like the person typed it themselves. Preserve their voice and tone.
+// chirp-cleanup-v2 was fine-tuned on the simple prompt below; benchmark on
+// 50 cases showed it beats the verbose Gemma-era prompt (32 vs 32 EXACT but
+// 0 vs 1 HALLUC, 0.959 vs 0.951 sim). See training/benchmark_chirp_v2.py.
+const BASE_SYSTEM_PROMPT: &str = "Clean up dictated speech. Remove fillers, fix stutters, resolve self-corrections (keep only the final version). Output only the cleaned text.";
 
-Remove:
-- Filler sounds: um, uh, uh huh, hmm, mmhmm
-- Filler \"like\" (but keep meaningful \"like\" as in \"I like pizza\" or \"something like that\")
-- Stutters and repeated words
-
-Keep exactly as spoken:
-- Words like alright, yeah, so, also, I mean, basically, honestly
-- Profanity
-- The beginning of sentences -- never drop opening words
-- The speaker's exact phrasing -- do not rephrase or restructure
-
-Self-corrections: when someone says \"X actually no Y\" or \"X wait Y\" or \"X no I mean Y\", they are correcting X to Y. Remove X entirely and keep Y.
-
-Format:
-- Ordinal lists (first/second/third, number one/two/three) -> numbered list
-- \"New paragraph\" or \"new line\" -> actual line break
-
-Examples:
-Input: So I think we should launch on Tuesday actually no Wednesday because um the design team needs one more day to finish the icons
-Output: So I think we should launch on Wednesday because the design team needs one more day to finish the icons.
-
-Input: Send it to John no I mean send it to Mike
-Output: Send it to Mike.
-
-Input: For the release we need to number one finish the migration number two update the docs and number three notify the customers
-Output: For the release we need to:
-1. Finish the migration
-2. Update the docs
-3. Notify the customers
-
-Output only the cleaned text.";
-
-const EMAIL_SYSTEM_PROMPT: &str = "\
-You clean up speech-to-text output and format it as an email. Make it read like the person typed the email directly.
-
-Remove:
-- Filler sounds: um, uh, uh huh, hmm, mmhmm
-- Filler \"like\" (keep meaningful uses)
-- Stutters and repeated words
-
-Keep exactly as spoken:
-- The speaker's exact phrasing -- do not rephrase or restructure
-- Do not drop opening words or censor profanity
-
-Self-corrections: when someone says \"X actually no Y\" or \"X no I mean Y\", keep only Y.
-
-Email formatting:
-- If the speech starts with a greeting (Hey/Hi/Hello/Dear + name), format as a full email: greeting on its own line, blank line, body paragraphs, blank line, sign-off
-- If the speech ends with a sign-off but no greeting, add a blank line before the sign-off
-- If there is no greeting or sign-off, just clean up the text normally
-- Preserve paragraph structure -- do not merge body paragraphs together
-- \"New paragraph\" or \"new line\" -> actual line break
-
-Output only the cleaned text.";
+// NOTE: chirp-cleanup-v2 was NOT trained on email-mode examples. This prompt
+// is a minimal extension of the base prompt; needs benchmarking before being
+// considered production-quality.
+const EMAIL_SYSTEM_PROMPT: &str = "Clean up dictated speech and format as an email. Remove fillers and resolve self-corrections (keep only the final version). Preserve greetings, paragraph breaks, and sign-offs on their own lines. Output only the cleaned email.";
 
 fn system_prompt_for_mode(mode: &str) -> String {
     match mode {
@@ -182,9 +134,9 @@ fn system_prompt_for_mode(mode: &str) -> String {
     }
 }
 
-const MODEL_FILENAME: &str = "gemma-4-E2B-it-Q4_K_M.gguf";
-const MODEL_URL: &str = "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf";
-const MODEL_SIZE: u64 = 3_110_000_000;
+const MODEL_FILENAME: &str = "chirp-cleanup-0.6b-q4_k_m.gguf";
+const MODEL_URL: &str = "https://huggingface.co/sitelift/chirp-cleanup-v2/resolve/main/chirp-cleanup-0.6b-q4_k_m.gguf";
+const MODEL_SIZE: u64 = 396_704_928;
 
 /// llama-server release info
 const LLAMA_CPP_VERSION: &str = "b8653";
@@ -444,7 +396,7 @@ pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
         .arg("512")
         .arg("--parallel")
         .arg("1")
-        .arg("--reasoning").arg("off")
+        .arg("--reasoning-budget").arg("0")
         .arg("--log-disable")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
@@ -516,20 +468,16 @@ async fn tokenize_text(port: u16, text: &str, client: &reqwest::Client) -> Resul
 }
 
 /// Send text through the LLM for cleanup.
-/// `vocabulary` provides known words/names so the LLM can correct ASR mishearings.
-pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, vocabulary: &[String], client: &reqwest::Client) -> Result<String, String> {
-    let mut prompt = system_prompt_for_mode(tone_mode);
-
-    // Inject vocabulary as hints for the LLM
-    if !vocabulary.is_empty() {
-        // Cap at 30 terms to avoid bloating the context window
-        let capped: Vec<&str> = vocabulary.iter().take(30).map(|s| s.as_str()).collect();
-        let terms = capped.join(", ");
-        prompt.push_str(&format!(
-            "\n\nThe speaker frequently uses these terms: {}. When ASR output sounds similar to one of these, use the correct spelling.",
-            terms
-        ));
-    }
+///
+/// Vocabulary biasing now happens at the ASR layer (sherpa-onnx hotwords),
+/// not via prompt injection. The previous Gemma-era code appended vocab terms
+/// to the system prompt, but chirp-cleanup-v2 (a narrow 0.6B fine-tune) was
+/// not trained to in-context-learn instructions outside its training prompt
+/// — feeding it vocab hints caused it to hallucinate, including swapping
+/// speaker/roommate identities when the speaker's actual name happened to be
+/// a vocab entry. Vocab is now ASR-only.
+pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, client: &reqwest::Client) -> Result<String, String> {
+    let prompt = system_prompt_for_mode(tone_mode);
 
     // Tokenize the input to get exact token count, then set max_tokens dynamically.
     // Cleanup output should be similar length or shorter, so input tokens + 20% margin is safe.
@@ -548,12 +496,16 @@ pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, vocabulary: &[
     };
 
     let payload = serde_json::json!({
-        "model": "gemma",
+        "model": "chirp-cleanup-v2",
         "messages": [
             {"role": "system", "content": prompt},
             {"role": "user", "content": text},
         ],
-        "temperature": 0.3,
+        // Greedy decoding (temp 0.0) for chirp-cleanup-v2: the fine-tuned 0.6B
+        // has a tendency to paraphrase / compress rambling input when sampled.
+        // Greedy is more conservative and produces near-deterministic output that
+        // stays closer to the speaker's original phrasing.
+        "temperature": 0.0,
         "top_p": 0.95,
         "top_k": 64,
         "max_tokens": max_tokens,
