@@ -1,0 +1,580 @@
+Running 7 candidate(s): ['qwen3-1.7b', 'qwen3-4b-instruct-2507', 'gemma-4-e2b-it', 'gemma-4-e4b-it', 'ministral-3-3b-2512', 'ministral-3-8b-2512', 'eurollm-9b']
+
+[1/7] === qwen3-1.7b ===
+  spawning llama-server.exe :60870 ...
+  server ready
+  [25/250] composite=0.999 (62ms)
+  [50/250] composite=0.937 (54ms)
+  [75/250] composite=0.789 (70ms)
+  [100/250] composite=0.740 (50ms)
+  [125/250] composite=0.710 (76ms)
+  [150/250] composite=0.756 (43ms)
+  [175/250] composite=0.774 (93ms)
+  [200/250] composite=0.793 (109ms)
+  [225/250] composite=0.743 (75ms)
+  [250/250] composite=0.704 (98ms)
+
+Results: C:\Users\dutch\chirp\training\benchmark_v3\results\qwen3-1.7b\20260408-015540
+
+================================================================
+  qwen3-1.7b  (20260408-015540)
+================================================================
+  cases:           250
+  composite:       0.704  (95% CI 0.664–0.742)
+  cat_success avg: 0.576
+  TTLT p50/p95/p99: 68 / 116 / 152 ms
+
+  per-category breakdown:
+  category                               n   cat_succ   composite
+  ----------------------------------- ---- ---------- -----------
+  adversarial_paraphrase_trap           10     100.0%       0.999
+  cross_sentence_self_correction        10       0.0%       0.352
+  explicit_self_correction              25       0.0%       0.344
+  identity_clean                        30     100.0%       0.999
+  implicit_self_correction              15       0.0%       0.354
+  long_multi_sentence                   20      90.0%       0.829
+  proper_nouns                          20      95.0%       0.982
+  short_input                           15     100.0%       1.000
+  single_filler                         25       8.0%       0.392
+  spoken_numbers_dates                  15     100.0%       1.000
+  stacked_fillers                       15       0.0%       0.356
+  stutter_repetition                    20      65.0%       0.781
+  technical_vocab                       15      93.3%       0.908
+  word_false_start                      15      53.3%       0.533
+
+  [!] DISQUALIFIED:
+    - hallucinator: WRR<0.85 on 13/250 (5.2%)
+    - changes-meaning: self-correction failures on 50/50 (100.0%)
+
+  worst 5 cases:
+    [eng-tech-005] 0.17  technical_vocab
+        IN:  Add a TODO comment in the auth handler.
+        REF: Add a TODO comment in the auth handler.
+        OUT: TODO: add auth handler
+
+# Auth Handler
+
+def handle_auth(request):
+    # Check if user is authenticated
+    if request.user.is_authenticated:
+        return JsonResponse({'status': 'authenticated'})
+    # If not, return error
+    return JsonResponse({'status': 'not authenticated'})
+    [eng-fs-003] 0.27  word_false_start
+        IN:  Can you- could you send the report?
+        REF: Could you send the report?
+        OUT: Can you send the report
+    [eng-scx-003] 0.30  cross_sentence_self_correction
+        IN:  Order 5 laptops. The 13-inch ones. Wait, make that 7 laptops.
+        REF: Order 7 13-inch laptops.
+        OUT: Order 5 laptops. The 13-inch ones. Wait, make that 7 laptops.
+    [eng-sce-013] 0.32  explicit_self_correction
+        IN:  We need 5 servers. Wait, make that 7.
+        REF: We need 7 servers.
+        OUT: We need 5 servers. Wait, make that 7.
+    [eng-sce-011] 0.32  explicit_self_correction
+        IN:  Email it to Alice. No actually send it to Bob.
+        REF: Send it to Bob.
+        OUT: Email it to Alice. No actually send it to Bob.
+
+[2/7] === qwen3-4b-instruct-2507 ===
+  spawning llama-server.exe :56327 ...
+  server ready
+  [25/250] composite=1.000 (74ms)
+  [50/250] composite=0.949 (62ms)
+  [75/250] composite=0.855 (96ms)
+  [100/250] composite=0.836 (78ms)
+  [125/250] composite=0.800 (104ms)
+  [150/250] composite=0.831 (72ms)
+  [175/250] composite=0.843 (155ms)
+  [200/250] composite=0.857 (162ms)
+  [225/250] composite=0.823 (92ms)
+  [250/250] composite=0.781 (150ms)
+
+Results: C:\Users\dutch\chirp\training\benchmark_v3\results\qwen3-4b-instruct-2507\20260408-015611
+
+================================================================
+  qwen3-4b-instruct-2507  (20260408-015611)
+================================================================
+  cases:           250
+  composite:       0.781  (95% CI 0.746–0.817)
+  cat_success avg: 0.688
+  TTLT p50/p95/p99: 86 / 184 / 253 ms
+
+  per-category breakdown:
+  category                               n   cat_succ   composite
+  ----------------------------------- ---- ---------- -----------
+  adversarial_paraphrase_trap           10     100.0%       1.000
+  cross_sentence_self_correction        10      20.0%       0.489
+  explicit_self_correction              25      36.0%       0.550
+  identity_clean                        30     100.0%       1.000
+  implicit_self_correction              15       0.0%       0.354
+  long_multi_sentence                   20      95.0%       0.867
+  proper_nouns                          20      95.0%       0.982
+  short_input                           15     100.0%       1.000
+  single_filler                         25      36.0%       0.566
+  spoken_numbers_dates                  15     100.0%       1.000
+  stacked_fillers                       15       6.7%       0.417
+  stutter_repetition                    20     100.0%       1.000
+  technical_vocab                       15      93.3%       0.958
+  word_false_start                      15      60.0%       0.638
+
+  [!] DISQUALIFIED:
+    - hallucinator: WRR<0.85 on 35/250 (14.0%)
+    - changes-meaning: self-correction failures on 39/50 (78.0%)
+
+  worst 5 cases:
+    [eng-fs-009] 0.26  word_false_start
+        IN:  I tried- I attempted to reproduce it locally.
+        REF: I attempted to reproduce it locally.
+        OUT: I tried to reproduce it locally.
+    [eng-fs-003] 0.29  word_false_start
+        IN:  Can you- could you send the report?
+        REF: Could you send the report?
+        OUT: Can you send the report?
+    [eng-sce-013] 0.30  explicit_self_correction
+        IN:  We need 5 servers. Wait, make that 7.
+        REF: We need 7 servers.
+        OUT: We need 5 servers. Make that 7.
+    [eng-scx-003] 0.30  cross_sentence_self_correction
+        IN:  Order 5 laptops. The 13-inch ones. Wait, make that 7 laptops.
+        REF: Order 7 13-inch laptops.
+        OUT: Order 5 laptops. The 13-inch ones. Wait, make that 7 laptops.
+    [eng-sce-017] 0.31  explicit_self_correction
+        IN:  Deploy to staging first. On second thought, go straight to prod.
+        REF: Go straight to prod.
+        OUT: Deploy to staging first. Go straight to prod.
+
+[3/7] === gemma-4-e2b-it ===
+  spawning llama-server.exe :59115 ...
+  server ready
+  [25/250] composite=0.846 (102ms)
+  [50/250] composite=0.674 (109ms)
+  [75/250] composite=0.632 (100ms)
+  [100/250] composite=0.623 (117ms)
+  [125/250] composite=0.617 (134ms)
+  [150/250] composite=0.658 (347ms)
+  [175/250] composite=0.656 (325ms)
+  [200/250] composite=0.651 (370ms)
+  [225/250] composite=0.616 (127ms)
+  [250/250] composite=0.585 (174ms)
+
+Results: C:\Users\dutch\chirp\training\benchmark_v3\results\gemma-4-e2b-it\20260408-015702
+
+================================================================
+  gemma-4-e2b-it  (20260408-015702)
+================================================================
+  cases:           250
+  composite:       0.585  (95% CI 0.539–0.632)
+  cat_success avg: 0.448
+  TTLT p50/p95/p99: 122 / 366 / 377 ms
+
+  per-category breakdown:
+  category                               n   cat_succ   composite
+  ----------------------------------- ---- ---------- -----------
+  adversarial_paraphrase_trap           10      40.0%       0.502
+  cross_sentence_self_correction        10       0.0%       0.300
+  explicit_self_correction              25      12.0%       0.333
+  identity_clean                        30      76.7%       0.821
+  implicit_self_correction              15       0.0%       0.309
+  long_multi_sentence                   20      70.0%       0.698
+  proper_nouns                          20      80.0%       0.872
+  short_input                           15      40.0%       0.492
+  single_filler                         25      24.0%       0.458
+  spoken_numbers_dates                  15      66.7%       0.748
+  stacked_fillers                       15       0.0%       0.301
+  stutter_repetition                    20      75.0%       0.805
+  technical_vocab                       15      46.7%       0.603
+  word_false_start                      15      53.3%       0.632
+
+  [!] DISQUALIFIED:
+    - hallucinator: WRR<0.85 on 49/250 (19.6%)
+    - paraphraser: LR-out-of-bounds on 59/250 (23.6%)
+    - changes-meaning: self-correction failures on 47/50 (94.0%)
+
+  worst 5 cases:
+    [eng-sce-023] 0.01  explicit_self_correction
+        IN:  We need 4 reviewers. Make that 2.
+        REF: We need 2 reviewers.
+        OUT: Thinking Process:
+
+1.  **Analyze the Request:** The goal is to clean up a dictated speech segment by removing filler words (um, uh, like, you know), stutters, and false starts, while preserving every other word exactly as spoken. Only the final, clean version should be
+    [eng-sce-002] 0.01  explicit_self_correction
+        IN:  Send it to John. No, send it to Mike.
+        REF: Send it to Mike.
+        OUT: Thinking Process:
+
+1.  **Analyze the Request:** The user wants me to clean up a dictated segment, removing filler words (um, uh, like, you know), stutters, and false starts, while preserving every other word exactly as spoken. The output should only be the cleaned text
+    [eng-sce-005] 0.01  explicit_self_correction
+        IN:  We should use Python. Scratch that, let's go with Rust instead.
+        REF: Let's go with Rust instead.
+        OUT: Thinking Process:
+
+1.  **Analyze the Request:** The goal is to clean up a dictated speech segment by removing filler words (um, uh, like, you know), stutters, and false starts. Crucially, I must *preserve every other word exactly as spoken* and only output
+    [eng-sf-013] 0.02  single_filler
+        IN:  I mean we don't really have a choice.
+        REF: We don't really have a choice.
+        OUT: Thinking Process:
+
+1.  **Analyze the Request:** The goal is to clean up a dictated speech segment by removing filler words (um, uh, like, you know), stutters, and false starts. Crucially, I must preserve every *other* word exactly as spoken and only keep
+    [eng-sce-016] 0.02  explicit_self_correction
+        IN:  Use the v1 endpoint. Wait, I mean v2.
+        REF: Use the v2 endpoint.
+        OUT: Thinking Process:
+
+1.  **Analyze the Request:** The user wants me to clean up a dictated speech segment.
+    *   **Rules:**
+        *   Remove filler words (um, uh, like, you know).
+        *   Remove stutters.
+        *
+
+[4/7] === gemma-4-e4b-it ===
+  spawning llama-server.exe :55049 ...
+  server ready
+  [25/250] composite=0.970 (133ms)
+  [50/250] composite=0.924 (127ms)
+  [75/250] composite=0.865 (172ms)
+  [100/250] composite=0.843 (147ms)
+  [125/250] composite=0.831 (183ms)
+  [150/250] composite=0.836 (532ms)
+  [175/250] composite=0.851 (258ms)
+  [200/250] composite=0.848 (256ms)
+  [225/250] composite=0.797 (227ms)
+  [250/250] composite=0.753 (234ms)
+
+Results: C:\Users\dutch\chirp\training\benchmark_v3\results\gemma-4-e4b-it\20260408-015754
+
+================================================================
+  gemma-4-e4b-it  (20260408-015754)
+================================================================
+  cases:           250
+  composite:       0.753  (95% CI 0.715–0.793)
+  cat_success avg: 0.644
+  TTLT p50/p95/p99: 152 / 361 / 537 ms
+
+  per-category breakdown:
+  category                               n   cat_succ   composite
+  ----------------------------------- ---- ---------- -----------
+  adversarial_paraphrase_trap           10      90.0%       0.936
+  cross_sentence_self_correction        10      10.0%       0.410
+  explicit_self_correction              25       8.0%       0.389
+  identity_clean                        30      93.3%       0.949
+  implicit_self_correction              15       0.0%       0.330
+  long_multi_sentence                   20      75.0%       0.735
+  proper_nouns                          20      80.0%       0.870
+  short_input                           15     100.0%       0.976
+  single_filler                         25      48.0%       0.669
+  spoken_numbers_dates                  15      93.3%       0.948
+  stacked_fillers                       15      13.3%       0.435
+  stutter_repetition                    20     100.0%       1.000
+  technical_vocab                       15     100.0%       1.000
+  word_false_start                      15      80.0%       0.830
+
+  [!] DISQUALIFIED:
+    - hallucinator: WRR<0.85 on 24/250 (9.6%)
+    - changes-meaning: self-correction failures on 47/50 (94.0%)
+
+  worst 5 cases:
+    [eng-sci-015] 0.02  implicit_self_correction
+        IN:  The PR is ready. The PR needs another review.
+        REF: The PR needs another review.
+        OUT: The user wants me to clean up a short dictated speech segment.
+The instructions are:
+1. Remove filler words (um, uh, like, you know), stutters, and false starts.
+2. For self-corrections, keep only the final version.
+3. Preserve
+    [eng-lng-019] 0.07  long_multi_sentence
+        IN:  The customer escalated the bug to enterprise support. They're threatening to churn if we don't have a fix by end of week. I think we need to drop everything else.
+        REF: The customer escalated the bug to enterprise support. They're threatening to churn if we don't have a fix by end of week. I think we need to drop everything else.
+        OUT: The user wants me to clean up a short dictation segment.
+Instructions:
+1. Remove filler words (um, uh, like, you know).
+2. Remove stutters and false starts.
+3. For self-corrections, keep only the final version.
+4. Preserve every other word exactly as spoken.
+    [eng-lng-013] 0.07  long_multi_sentence
+        IN:  Last quarter we shipped the new dashboard, the auth refactor, and the billing rewrite. Customer feedback has been mostly positive. We do need to address the export bug before end of month.
+        REF: Last quarter we shipped the new dashboard, the auth refactor, and the billing rewrite. Customer feedback has been mostly positive. We do need to address the export bug before end of month.
+        OUT: The user wants me to clean up a short dictated speech segment.
+The instructions are:
+1. Remove filler words (um, uh, like, you know). (None present)
+2. Remove stutters and false starts. (None present)
+3. For self-corrections, keep only the final version. (None present)
+    [eng-num-010] 0.23  spoken_numbers_dates
+        IN:  The doc is fifteen pages long.
+        REF: The doc is fifteen pages long.
+        OUT: The user wants me to clean up a very short segment: "The doc is fifteen pages long."
+This segment has no filler words, stutters, or false starts.
+I must preserve every word exactly as spoken.
+
+Output: The doc is fifteen pages long.<channel|>The doc is fifteen
+    [eng-id-027] 0.23  identity_clean
+        IN:  The new design looks much cleaner.
+        REF: The new design looks much cleaner.
+        OUT: The user wants me to clean up a short dictated speech segment.
+The input is: "The new design looks much cleaner."
+This segment has no filler words, stutters, or false starts.
+I must preserve every other word exactly as spoken and output only the cleaned text.
+
+Input
+
+[5/7] === ministral-3-3b-2512 ===
+  spawning llama-server.exe :61709 ...
+  server ready
+  [25/250] composite=0.830 (47ms)
+  [50/250] composite=0.762 (61ms)
+  [75/250] composite=0.702 (82ms)
+  [100/250] composite=0.708 (68ms)
+  [125/250] composite=0.677 (75ms)
+  [150/250] composite=0.715 (62ms)
+  [175/250] composite=0.738 (133ms)
+  [200/250] composite=0.751 (142ms)
+  [225/250] composite=0.732 (66ms)
+  [250/250] composite=0.700 (130ms)
+
+Results: C:\Users\dutch\chirp\training\benchmark_v3\results\ministral-3-3b-2512\20260408-015822
+
+================================================================
+  ministral-3-3b-2512  (20260408-015822)
+================================================================
+  cases:           250
+  composite:       0.700  (95% CI 0.660–0.738)
+  cat_success avg: 0.644
+  TTLT p50/p95/p99: 73 / 186 / 798 ms
+
+  per-category breakdown:
+  category                               n   cat_succ   composite
+  ----------------------------------- ---- ---------- -----------
+  adversarial_paraphrase_trap           10      70.0%       0.762
+  cross_sentence_self_correction        10      30.0%       0.535
+  explicit_self_correction              25      52.0%       0.575
+  identity_clean                        30      73.3%       0.837
+  implicit_self_correction              15       0.0%       0.329
+  long_multi_sentence                   20     100.0%       0.876
+  proper_nouns                          20      85.0%       0.889
+  short_input                           15      73.3%       0.702
+  single_filler                         25      44.0%       0.606
+  spoken_numbers_dates                  15     100.0%       0.928
+  stacked_fillers                       15      26.7%       0.527
+  stutter_repetition                    20      80.0%       0.721
+  technical_vocab                       15      86.7%       0.860
+  word_false_start                      15      60.0%       0.494
+
+  [!] DISQUALIFIED:
+    - hallucinator: WRR<0.85 on 73/250 (29.2%)
+    - changes-meaning: self-correction failures on 34/50 (68.0%)
+
+  worst 5 cases:
+    [eng-sh-009] 0.00  short_input
+        IN:  Done.
+        REF: Done.
+        OUT: The **project** will **begin** next week.
+
+We **need** to **finalize** the **timeline** first.
+
+I **think** we **should** include **feedback** from **all** stakeholders.
+
+The **deadline** is **strictly** January **15th**.
+
+We **must
+    [eng-sh-015] 0.01  short_input
+        IN:  Send me the link.
+        REF: Send me the link.
+        OUT: Here’s the cleaned version:
+
+**[Sentence removed as it was not provided for cleaning.]**
+
+(If you meant to dictate a full speech, please provide the original text for further cleaning.)
+    [eng-tech-008] 0.08  technical_vocab
+        IN:  Use SHA256 for the checksum.
+        REF: Use SHA256 for the checksum.
+        OUT: The project involves analyzing data for integrity verification. We’ll compute checksums using SHA256 to ensure files haven’t been altered. This method provides cryptographic security, detecting even small changes. Implementation requires a library supporting the algorithm, like OpenSSL or Python’s hashlib. The process includes reading file chunks, has
+    [eng-st-001] 0.09  stutter_repetition
+        IN:  We we need to finish the report by Friday.
+        REF: We need to finish the report by Friday.
+        OUT: by Friday.
+    [eng-tech-005] 0.13  technical_vocab
+        IN:  Add a TODO comment in the auth handler.
+        REF: Add a TODO comment in the auth handler.
+        OUT: ```csharp
+// TODO: Auth handler validation logic should include additional checks for security.
+public async Task<IActionResult> AuthHandler(LoginModel model)
+{
+    if (ModelState.IsValid)
+    {
+        var user = await _userManager.FindByNameAsync(model.Username);
+        if (user != null
+
+[6/7] === ministral-3-8b-2512 ===
+  spawning llama-server.exe :61989 ...
+  server ready
+  [25/250] composite=0.781 (98ms)
+  [50/250] composite=0.771 (97ms)
+  [75/250] composite=0.771 (160ms)
+  [100/250] composite=0.766 (143ms)
+  [125/250] composite=0.752 (185ms)
+  [150/250] composite=0.765 (119ms)
+  [175/250] composite=0.757 (250ms)
+  [200/250] composite=0.743 (226ms)
+  [225/250] composite=0.731 (163ms)
+  [250/250] composite=0.704 (247ms)
+
+Results: C:\Users\dutch\chirp\training\benchmark_v3\results\ministral-3-8b-2512\20260408-015913
+
+================================================================
+  ministral-3-8b-2512  (20260408-015913)
+================================================================
+  cases:           250
+  composite:       0.704  (95% CI 0.667–0.743)
+  cat_success avg: 0.620
+  TTLT p50/p95/p99: 138 / 411 / 648 ms
+
+  per-category breakdown:
+  category                               n   cat_succ   composite
+  ----------------------------------- ---- ---------- -----------
+  adversarial_paraphrase_trap           10      30.0%       0.480
+  cross_sentence_self_correction        10      40.0%       0.561
+  explicit_self_correction              25      52.0%       0.637
+  identity_clean                        30      66.7%       0.817
+  implicit_self_correction              15      13.3%       0.379
+  long_multi_sentence                   20      85.0%       0.769
+  proper_nouns                          20      80.0%       0.843
+  short_input                           15      66.7%       0.730
+  single_filler                         25      60.0%       0.709
+  spoken_numbers_dates                  15      80.0%       0.797
+  stacked_fillers                       15      13.3%       0.450
+  stutter_repetition                    20      95.0%       0.954
+  technical_vocab                       15      66.7%       0.662
+  word_false_start                      15      80.0%       0.715
+
+  [!] DISQUALIFIED:
+    - hallucinator: WRR<0.85 on 51/250 (20.4%)
+    - changes-meaning: self-correction failures on 31/50 (62.0%)
+
+  worst 5 cases:
+    [eng-tech-005] 0.10  technical_vocab
+        IN:  Add a TODO comment in the auth handler.
+        REF: Add a TODO comment in the auth handler.
+        OUT: ```python
+# TODO: Add proper authentication logic here
+def auth_handler(request):
+    # Current placeholder logic
+    return {"status": "success", "message": "Authentication placeholder"}
+```
+    [eng-sci-007] 0.12  implicit_self_correction
+        IN:  Use Postgres. Use MySQL.
+        REF: Use MySQL.
+        OUT: Use **PostgreSQL**—it’s a powerful, open-source relational database known for its robustness and advanced features like JSON support and extensibility.
+
+For **MySQL**, it’s widely used for its simplicity, speed, and strong community backing, especially in web applications. Both are excellent choices, but PostgreSQL often
+    [eng-tech-008] 0.16  technical_vocab
+        IN:  Use SHA256 for the checksum.
+        REF: Use SHA256 for the checksum.
+        OUT: Here’s your cleaned segment:
+
+---
+**Original (with filler/errors):**
+*"Okay, so uh—you know—I think we should use the—uh—SHA-256 for the checksum. Like, it’s secure, right? Um... yeah, definitely."*
+
+**Cleaned (only final version,
+    [eng-sh-009] 0.17  short_input
+        IN:  Done.
+        REF: Done.
+        OUT: Here’s your cleaned segment:
+
+---
+**Original:**
+*"Okay, so um—like, I was thinking about—uh, you know, the project we’re working on. It’s supposed to be done by Friday, but uh, I think we might need to adjust the timeline a little. Like, maybe we could
+    [eng-sh-006] 0.18  short_input
+        IN:  Will do.
+        REF: Will do.
+        OUT: Here’s your cleaned segment (though you provided just a single phrase—here’s how it would look if you dictated it with fillers):
+
+**Original (with filler):**
+*"Uh, I—uh, I’ll—like, I’ll definitely do that. Yeah, will do."*
+
+**Cleaned:**
+*"
+
+[7/7] === eurollm-9b ===
+  spawning llama-server.exe :59162 ...
+  server ready
+  [25/250] composite=1.000 (116ms)
+  [50/250] composite=0.949 (118ms)
+  [75/250] composite=0.824 (144ms)
+  [100/250] composite=0.815 (153ms)
+  [125/250] composite=0.779 (183ms)
+  [150/250] composite=0.805 (116ms)
+  [175/250] composite=0.828 (280ms)
+  [200/250] composite=0.836 (272ms)
+  [225/250] composite=0.819 (145ms)
+  [250/250] composite=0.791 (279ms)
+
+Results: C:\Users\dutch\chirp\training\benchmark_v3\results\eurollm-9b\20260408-015959
+
+================================================================
+  eurollm-9b  (20260408-015959)
+================================================================
+  cases:           250
+  composite:       0.791  (95% CI 0.756–0.826)
+  cat_success avg: 0.720
+  TTLT p50/p95/p99: 144 / 305 / 451 ms
+
+  per-category breakdown:
+  category                               n   cat_succ   composite
+  ----------------------------------- ---- ---------- -----------
+  adversarial_paraphrase_trap           10      70.0%       0.808
+  cross_sentence_self_correction        10      50.0%       0.629
+  explicit_self_correction              25      60.0%       0.687
+  identity_clean                        30     100.0%       1.000
+  implicit_self_correction              15      20.0%       0.466
+  long_multi_sentence                   20     100.0%       0.949
+  proper_nouns                          20      95.0%       0.982
+  short_input                           15     100.0%       0.997
+  single_filler                         25      24.0%       0.487
+  spoken_numbers_dates                  15     100.0%       0.921
+  stacked_fillers                       15      20.0%       0.471
+  stutter_repetition                    20     100.0%       0.985
+  technical_vocab                       15      93.3%       0.958
+  word_false_start                      15      53.3%       0.561
+
+  [!] DISQUALIFIED:
+    - hallucinator: WRR<0.85 on 46/250 (18.4%)
+    - changes-meaning: self-correction failures on 27/50 (54.0%)
+
+  worst 5 cases:
+    [eng-scx-006] 0.16  cross_sentence_self_correction
+        IN:  Move the standup to 9 AM. So we have time before the all-hands. Wait, 8 AM is better.
+        REF: Move the standup to 8 AM. So we have time before the all-hands.
+        OUT: Move the standup to 8 AM.
+    [eng-fs-012] 0.19  word_false_start
+        IN:  Maybe we- let's just revert it.
+        REF: Let's just revert it.
+        OUT: Maybe we revert it.
+    [eng-fs-009] 0.26  word_false_start
+        IN:  I tried- I attempted to reproduce it locally.
+        REF: I attempted to reproduce it locally.
+        OUT: I tried to reproduce it locally.
+    [eng-sci-001] 0.27  implicit_self_correction
+        IN:  Meet at 3. Meet at 4.
+        REF: Meet at 4.
+        OUT: Meet at 3.
+    [eng-fs-003] 0.29  word_false_start
+        IN:  Can you- could you send the report?
+        REF: Could you send the report?
+        OUT: Can you send the report?
+
+==============================================================================
+  Phase C matrix — final ranking
+==============================================================================
+  candidate                     composite   cat_succ   p95(ms)  status
+  ---------------------------- ---------- ---------- ---------  ---------------
+  eurollm-9b                        0.791      72.0%       305  [!] DQ
+  qwen3-4b-instruct-2507            0.781      68.8%       184  [!] DQ
+  gemma-4-e4b-it                    0.753      64.4%       361  [!] DQ
+  qwen3-1.7b                        0.704      57.6%       116  [!] DQ
+  ministral-3-8b-2512               0.704      62.0%       411  [!] DQ
+  ministral-3-3b-2512               0.700      64.4%       186  [!] DQ
+  gemma-4-e2b-it                    0.585      44.8%       366  [!] DQ
+
+Matrix summary: C:\Users\dutch\chirp\training\benchmark_v3\results\matrix_summary.json

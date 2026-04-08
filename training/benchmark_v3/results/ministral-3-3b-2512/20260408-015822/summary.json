@@ -1,0 +1,102 @@
+{
+  "candidate": "ministral-3-3b-2512",
+  "timestamp": "20260408-015822",
+  "n_cases": 250,
+  "composite_mean": 0.6996230428852023,
+  "composite_ci_low": 0.6597218955252881,
+  "composite_ci_high": 0.7376482147372101,
+  "category_success_mean": 0.644,
+  "ttlt_p50_ms": 73.39286804199219,
+  "ttlt_p95_ms": 186.30504608154297,
+  "ttlt_p99_ms": 798.2923984527588,
+  "by_category": [
+    {
+      "category": "adversarial_paraphrase_trap",
+      "n": 10,
+      "category_success": 0.7,
+      "composite": 0.7620763626615752
+    },
+    {
+      "category": "cross_sentence_self_correction",
+      "n": 10,
+      "category_success": 0.3,
+      "composite": 0.5350866168470891
+    },
+    {
+      "category": "explicit_self_correction",
+      "n": 25,
+      "category_success": 0.52,
+      "composite": 0.574631558227953
+    },
+    {
+      "category": "identity_clean",
+      "n": 30,
+      "category_success": 0.7333333333333333,
+      "composite": 0.8368303400792522
+    },
+    {
+      "category": "implicit_self_correction",
+      "n": 15,
+      "category_success": 0.0,
+      "composite": 0.32880084605928317
+    },
+    {
+      "category": "long_multi_sentence",
+      "n": 20,
+      "category_success": 1.0,
+      "composite": 0.8756822471155875
+    },
+    {
+      "category": "proper_nouns",
+      "n": 20,
+      "category_success": 0.85,
+      "composite": 0.888787298337846
+    },
+    {
+      "category": "short_input",
+      "n": 15,
+      "category_success": 0.7333333333333333,
+      "composite": 0.702451444936577
+    },
+    {
+      "category": "single_filler",
+      "n": 25,
+      "category_success": 0.44,
+      "composite": 0.6055746895927335
+    },
+    {
+      "category": "spoken_numbers_dates",
+      "n": 15,
+      "category_success": 1.0,
+      "composite": 0.9277580756399999
+    },
+    {
+      "category": "stacked_fillers",
+      "n": 15,
+      "category_success": 0.26666666666666666,
+      "composite": 0.5273881138061896
+    },
+    {
+      "category": "stutter_repetition",
+      "n": 20,
+      "category_success": 0.8,
+      "composite": 0.7214116842474982
+    },
+    {
+      "category": "technical_vocab",
+      "n": 15,
+      "category_success": 0.8666666666666667,
+      "composite": 0.8602909374467802
+    },
+    {
+      "category": "word_false_start",
+      "n": 15,
+      "category_success": 0.6,
+      "composite": 0.49373991106454096
+    }
+  ],
+  "disqualifications": [
+    "hallucinator: WRR<0.85 on 73/250 (29.2%)",
+    "changes-meaning: self-correction failures on 34/50 (68.0%)"
+  ]
+}
