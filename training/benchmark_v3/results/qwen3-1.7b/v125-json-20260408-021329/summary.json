@@ -1,101 +1,101 @@
 {
   "candidate": "qwen3-1.7b",
-  "timestamp": "20260408-015540",
+  "timestamp": "v125-json-20260408-021329",
   "n_cases": 250,
-  "composite_mean": 0.7042188451565797,
-  "composite_ci_low": 0.6640138399933745,
-  "composite_ci_high": 0.7421698942303532,
-  "category_success_mean": 0.576,
-  "ttlt_p50_ms": 67.8858757019043,
-  "ttlt_p95_ms": 116.42622947692871,
-  "ttlt_p99_ms": 151.55839920043945,
+  "composite_mean": 0.7202601815625939,
+  "composite_ci_low": 0.6842919916850134,
+  "composite_ci_high": 0.7580810565089129,
+  "category_success_mean": 0.6,
+  "ttlt_p50_ms": 88.16695213317871,
+  "ttlt_p95_ms": 136.00683212280273,
+  "ttlt_p99_ms": 169.5268154144287,
   "by_category": [
     {
       "category": "adversarial_paraphrase_trap",
       "n": 10,
       "category_success": 1.0,
-      "composite": 0.998811646802016
+      "composite": 0.9708931113792895
     },
     {
       "category": "cross_sentence_self_correction",
       "n": 10,
       "category_success": 0.0,
-      "composite": 0.35168488710703716
+      "composite": 0.3539777059028539
     },
     {
       "category": "explicit_self_correction",
       "n": 25,
-      "category_success": 0.0,
-      "composite": 0.34351683696639795
+      "category_success": 0.12,
+      "composite": 0.41649699758348846
     },
     {
       "category": "identity_clean",
       "n": 30,
-      "category_success": 1.0,
-      "composite": 0.9993823814055457
+      "category_success": 0.9666666666666667,
+      "composite": 0.9785592510113701
     },
     {
       "category": "implicit_self_correction",
       "n": 15,
       "category_success": 0.0,
-      "composite": 0.3535998949357822
+      "composite": 0.3504835847643987
     },
     {
       "category": "long_multi_sentence",
       "n": 20,
-      "category_success": 0.9,
-      "composite": 0.828944935418338
+      "category_success": 0.8,
+      "composite": 0.7616223915371694
     },
     {
       "category": "proper_nouns",
       "n": 20,
       "category_success": 0.95,
-      "composite": 0.9824654504151704
+      "composite": 0.9808706371073456
     },
     {
       "category": "short_input",
       "n": 15,
       "category_success": 1.0,
-      "composite": 1.0
+      "composite": 0.9890127304639357
     },
     {
       "category": "single_filler",
       "n": 25,
-      "category_success": 0.08,
-      "composite": 0.39217773893537566
+      "category_success": 0.12,
+      "composite": 0.41593060089194467
     },
     {
       "category": "spoken_numbers_dates",
       "n": 15,
       "category_success": 1.0,
-      "composite": 1.0
+      "composite": 0.9530003425270276
     },
     {
       "category": "stacked_fillers",
       "n": 15,
       "category_success": 0.0,
-      "composite": 0.3562481524180506
+      "composite": 0.35503839625141137
     },
     {
       "category": "stutter_repetition",
       "n": 20,
-      "category_success": 0.65,
-      "composite": 0.781124644718658
+      "category_success": 0.95,
+      "composite": 0.968946517207376
     },
     {
       "category": "technical_vocab",
       "n": 15,
-      "category_success": 0.9333333333333333,
-      "composite": 0.9019986708886825
+      "category_success": 0.8666666666666667,
+      "composite": 0.9120291704539258
     },
     {
       "category": "word_false_start",
       "n": 15,
       "category_success": 0.5333333333333333,
-      "composite": 0.5431672483775093
+      "composite": 0.601774362776786
     }
   ],
   "disqualifications": [
-    "changes-meaning: self-correction failures on 50/50 (100.0%)"
+    "changes-meaning: self-correction failures on 47/50 (94.0%)"
   ]
 }

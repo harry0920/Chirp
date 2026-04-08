@@ -1,14 +1,14 @@
 {
   "candidate": "qwen3-1.7b",
-  "timestamp": "20260408-015540",
+  "timestamp": "prod-v13-20260408-021244",
   "n_cases": 250,
-  "composite_mean": 0.7042188451565797,
-  "composite_ci_low": 0.6640138399933745,
-  "composite_ci_high": 0.7421698942303532,
-  "category_success_mean": 0.576,
-  "ttlt_p50_ms": 67.8858757019043,
-  "ttlt_p95_ms": 116.42622947692871,
-  "ttlt_p99_ms": 151.55839920043945,
+  "composite_mean": 0.7018311251550817,
+  "composite_ci_low": 0.6618486068887304,
+  "composite_ci_high": 0.7400783796550601,
+  "category_success_mean": 0.572,
+  "ttlt_p50_ms": 66.90239906311035,
+  "ttlt_p95_ms": 115.27442932128906,
+  "ttlt_p99_ms": 139.45317268371582,
   "by_category": [
     {
       "category": "adversarial_paraphrase_trap",
@@ -44,7 +44,7 @@
       "category": "long_multi_sentence",
       "n": 20,
       "category_success": 0.9,
-      "composite": 0.828944935418338
+      "composite": 0.8292241429380158
     },
     {
       "category": "proper_nouns",
@@ -74,19 +74,19 @@
       "category": "stacked_fillers",
       "n": 15,
       "category_success": 0.0,
-      "composite": 0.3562481524180506
+      "composite": 0.356393901710454
     },
     {
       "category": "stutter_repetition",
       "n": 20,
-      "category_success": 0.65,
-      "composite": 0.781124644718658
+      "category_success": 0.55,
+      "composite": 0.7195124155176119
     },
     {
       "category": "technical_vocab",
       "n": 15,
-      "category_success": 0.9333333333333333,
-      "composite": 0.9019986708886825
+      "category_success": 1.0,
+      "composite": 0.9438349504798029
     },
     {
       "category": "word_false_start",

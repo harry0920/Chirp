@@ -2,9 +2,9 @@
   "candidate": "qwen3-0.6b",
   "timestamp": "20260408-013720",
   "n_cases": 250,
-  "composite_mean": 0.75908360425995,
-  "composite_ci_low": 0.7203653490653913,
-  "composite_ci_high": 0.7945107818193237,
+  "composite_mean": 0.765373022249368,
+  "composite_ci_low": 0.7262904691278923,
+  "composite_ci_high": 0.8002073873962757,
   "category_success_mean": 0.668,
   "ttlt_p50_ms": 49.71432685852051,
   "ttlt_p95_ms": 85.4489803314209,
@@ -20,25 +20,25 @@
       "category": "cross_sentence_self_correction",
       "n": 10,
       "category_success": 0.1,
-      "composite": 0.43103402965279997
+      "composite": 0.4389044000231704
     },
     {
       "category": "explicit_self_correction",
       "n": 25,
       "category_success": 0.36,
-      "composite": 0.5452691650696588
+      "composite": 0.5763485301490239
     },
     {
       "category": "identity_clean",
       "n": 30,
       "category_success": 0.9666666666666667,
-      "composite": 0.9772791436358631
+      "composite": 0.978668032524752
     },
     {
       "category": "implicit_self_correction",
       "n": 15,
       "category_success": 0.06666666666666667,
-      "composite": 0.380540689760084
+      "composite": 0.3901703193897136
     },
     {
       "category": "long_multi_sentence",
@@ -68,7 +68,7 @@
       "category": "spoken_numbers_dates",
       "n": 15,
       "category_success": 1.0,
-      "composite": 0.9458561611564137
+      "composite": 0.9488191241193766
     },
     {
       "category": "stacked_fillers",
@@ -86,17 +86,16 @@
       "category": "technical_vocab",
       "n": 15,
       "category_success": 1.0,
-      "composite": 0.937672033177666
+      "composite": 0.9395238850295178
     },
     {
       "category": "word_false_start",
       "n": 15,
       "category_success": 0.6,
-      "composite": 0.5858679062471459
+      "composite": 0.6164234618027016
     }
   ],
   "disqualifications": [
-    "hallucinator: WRR<0.85 on 38/250 (15.2%)",
     "changes-meaning: self-correction failures on 39/50 (78.0%)"
   ]
 }

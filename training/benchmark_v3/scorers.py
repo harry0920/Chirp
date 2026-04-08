@@ -138,18 +138,26 @@ def edit_f05(case: Dict[str, Any], output: str) -> float:
 # ── 3. Word Retention Rate ──────────────────────────────────────────────────
 
 def wrr(case: Dict[str, Any], output: str) -> float:
-    """Faithfulness guardrail: |content(out) ∩ content(in)| / |content(in)|.
+    """Faithfulness guardrail: precision of output content words against input.
 
-    A WRR near 1.0 means the output is a subset of the input — the model
-    isn't inventing words. A WRR < 0.85 is the documented hallucination
-    red flag in the plan.
+    WRR = |content(out) ∩ content(in)| / |content(out)|
+
+    A WRR near 1.0 means every content word in the output also appeared in
+    the input — the model isn't hallucinating new words. A WRR < 0.85 is
+    the documented hallucination red flag in the plan §A.2.
+
+    Note: an earlier version of this metric computed RECALL of input
+    content instead of PRECISION of output content, which incorrectly
+    penalized models for correctly dropping self-correction text. The
+    plan's stated intent ("output is a subset of input") matches this
+    precision-of-output formulation.
     """
     in_content = set(_content_tokens(case["input"]))
     out_content = set(_content_tokens(output))
-    if not in_content:
-        return 1.0
+    if not out_content:
+        return 1.0  # empty output can't hallucinate
     overlap = len(in_content & out_content)
-    return overlap / len(in_content)
+    return overlap / len(out_content)
 
 
 # ── 4. chrF++ via sacrebleu ─────────────────────────────────────────────────

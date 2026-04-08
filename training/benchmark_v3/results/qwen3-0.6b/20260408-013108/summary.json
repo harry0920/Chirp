@@ -2,8 +2,8 @@
   "candidate": "qwen3-0.6b",
   "timestamp": "20260408-013108",
   "n_cases": 60,
-  "composite_mean": 0.8690088388141393,
-  "composite_ci_low": 0.8054007420873491,
+  "composite_mean": 0.8695643943696948,
+  "composite_ci_low": 0.8061759639379258,
   "composite_ci_high": 0.9278641285255897,
   "category_success_mean": 0.8166666666666667,
   "ttlt_p50_ms": 47.53875732421875,
@@ -14,7 +14,7 @@
       "category": "identity_clean",
       "n": 30,
       "category_success": 0.9666666666666667,
-      "composite": 0.9776523562899971
+      "composite": 0.9787634674011083
     },
     {
       "category": "short_input",

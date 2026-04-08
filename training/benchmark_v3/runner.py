@@ -28,23 +28,13 @@ import yaml
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 import scorers
+import prompts
 
 CORPUS_PATH = ROOT / "corpus" / "english_gold.jsonl"
 CANDIDATES_PATH = ROOT / "candidates.yaml"
 RESULTS_DIR = ROOT / "results"
 
-# System prompt copied verbatim from src-tauri/src/llm.rs:128 (BASE_SYSTEM_PROMPT).
-# Production-vs-eval drift on the prompt would invalidate every benchmark
-# result, so this string MUST track production. Any change to llm.rs
-# requires a matching update here. (TODO: extract to a shared JSON file
-# loaded by both — see plan §A.5 reproducibility rules.)
-SYSTEM_PROMPT = (
-    "Clean up a short dictated speech segment. Remove filler words "
-    "(um, uh, like, you know), stutters, and false starts. For "
-    "self-corrections, keep only the final version. Preserve every other "
-    "word exactly as spoken. Do not summarize, paraphrase, or reword. "
-    "Output only the cleaned text."
-)
+DEFAULT_STRATEGY = "prod-v13"
 
 
 def load_corpus() -> List[Dict]:
@@ -121,14 +111,24 @@ def spawn_server(cand: Dict, port: int) -> subprocess.Popen:
     raise RuntimeError("llama-server failed to start within 60s")
 
 
-def cleanup_text(port: int, text: str, sampling: Dict, model_id: str) -> str:
-    """Send a single cleanup request to the running llama-server."""
+def build_messages(strategy: Dict, text: str) -> List[Dict]:
+    """Build the chat messages for a single case using a prompt strategy."""
+    msgs = [{"role": "system", "content": strategy["system"]}]
+    for u, a in strategy.get("fewshot", []):
+        msgs.append({"role": "user", "content": strategy["wrap_input"](u)})
+        msgs.append({"role": "assistant", "content": a})
+    msgs.append({"role": "user", "content": strategy["wrap_input"](text)})
+    return msgs
+
+
+def cleanup_text(port: int, text: str, sampling: Dict, model_id: str, strategy: Dict) -> tuple[str, str]:
+    """Send a single cleanup request to the running llama-server.
+
+    Returns (parsed_output, raw_response) so the per_case file can record
+    both — useful when debugging why a JSON parser fell back."""
     payload = {
         "model": model_id,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": text},
-        ],
+        "messages": build_messages(strategy, text),
         "stream": False,
         "cache_prompt": True,
         **sampling,
@@ -140,7 +140,9 @@ def cleanup_text(port: int, text: str, sampling: Dict, model_id: str) -> str:
     )
     with urllib.request.urlopen(req, timeout=120) as r:
         body = json.loads(r.read())
-    return body["choices"][0]["message"]["content"].strip()
+    raw = body["choices"][0]["message"]["content"]
+    parsed = strategy["parse_output"](raw)
+    return parsed, raw
 
 
 def dynamic_max_tokens(text: str) -> int:
@@ -149,8 +151,9 @@ def dynamic_max_tokens(text: str) -> int:
     return max(int(word_count * 2.0 * 1.2), 64)
 
 
-def run_candidate(name: str, limit: int | None, greedy: bool) -> Path:
+def run_candidate(name: str, limit: int | None, greedy: bool, strategy_name: str = DEFAULT_STRATEGY) -> Path:
     cand = load_candidates()[name]
+    strategy = prompts.get(strategy_name)
     cases = load_corpus()
     if limit:
         cases = cases[:limit]
@@ -171,10 +174,11 @@ def run_candidate(name: str, limit: int | None, greedy: bool) -> Path:
             sampling["max_tokens"] = dynamic_max_tokens(case["input"])
             t0 = time.time()
             try:
-                output = cleanup_text(port, case["input"], sampling, cand.get("model_id", name))
+                output, raw = cleanup_text(port, case["input"], sampling, cand.get("model_id", name), strategy)
                 err = None
             except Exception as e:
                 output = ""
+                raw = ""
                 err = str(e)
             ttlt_ms = (time.time() - t0) * 1000
 
@@ -185,6 +189,7 @@ def run_candidate(name: str, limit: int | None, greedy: bool) -> Path:
                 "input": case["input"],
                 "reference": case["reference"],
                 "output": output,
+                "raw": raw,
                 "ttlt_ms": ttlt_ms,
                 "scores": score,
                 "error": err,
@@ -201,23 +206,25 @@ def run_candidate(name: str, limit: int | None, greedy: bool) -> Path:
         except subprocess.TimeoutExpired:
             pass
 
-    # Save results
+    # Save results — strategy name in the directory so multiple
+    # strategies on the same candidate don't collide.
     ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    out_dir = RESULTS_DIR / name / ts
+    out_dir = RESULTS_DIR / name / f"{strategy_name}-{ts}"
     out_dir.mkdir(parents=True, exist_ok=True)
-    with (out_dir / "per_case.jsonl").open("w") as f:
+    with (out_dir / "per_case.jsonl").open("w", encoding="utf-8") as f:
         for r in results:
-            f.write(json.dumps(r) + "\n")
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
     # Per-candidate metadata
     meta = {
         "candidate": name,
+        "strategy": strategy_name,
         "model_path": cand["model"],
         "sampling": sampling_base,
         "greedy": greedy,
         "n_cases": len(results),
         "elapsed_seconds": elapsed,
-        "system_prompt": SYSTEM_PROMPT,
+        "system_prompt": strategy["system"],
         "timestamp": ts,
     }
     with (out_dir / "meta.json").open("w") as f:
@@ -230,10 +237,11 @@ def run_candidate(name: str, limit: int | None, greedy: bool) -> Path:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidate", required=True)
+    ap.add_argument("--strategy", default=DEFAULT_STRATEGY, help=f"prompt strategy (default {DEFAULT_STRATEGY})")
     ap.add_argument("--limit", type=int, default=None, help="run first N cases only")
     ap.add_argument("--greedy", action="store_true", help="cross-candidate greedy mode")
     args = ap.parse_args()
-    run_candidate(args.candidate, args.limit, args.greedy)
+    run_candidate(args.candidate, args.limit, args.greedy, args.strategy)
 
 
 if __name__ == "__main__":

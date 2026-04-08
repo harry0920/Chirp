@@ -2,9 +2,9 @@
   "candidate": "gemma-4-e4b-it",
   "timestamp": "20260408-015754",
   "n_cases": 250,
-  "composite_mean": 0.7531784116488816,
-  "composite_ci_low": 0.7153478785584045,
-  "composite_ci_high": 0.7928258235346148,
+  "composite_mean": 0.7525697570706498,
+  "composite_ci_low": 0.7132921941984927,
+  "composite_ci_high": 0.7926639943532084,
   "category_success_mean": 0.644,
   "ttlt_p50_ms": 151.5219211578369,
   "ttlt_p95_ms": 360.6278896331787,
@@ -14,25 +14,25 @@
       "category": "adversarial_paraphrase_trap",
       "n": 10,
       "category_success": 0.9,
-      "composite": 0.9360499358544134
+      "composite": 0.9377166025210801
     },
     {
       "category": "cross_sentence_self_correction",
       "n": 10,
       "category_success": 0.1,
-      "composite": 0.40986188043292016
+      "composite": 0.41796373228477196
     },
     {
       "category": "explicit_self_correction",
       "n": 25,
       "category_success": 0.08,
-      "composite": 0.3888128396165158
+      "composite": 0.39727363807731436
     },
     {
       "category": "identity_clean",
       "n": 30,
       "category_success": 0.9333333333333333,
-      "composite": 0.9491827156258063
+      "composite": 0.9399895939326847
     },
     {
       "category": "implicit_self_correction",
@@ -44,19 +44,19 @@
       "category": "long_multi_sentence",
       "n": 20,
       "category_success": 0.75,
-      "composite": 0.7346343804589086
+      "composite": 0.7275830984076266
     },
     {
       "category": "proper_nouns",
       "n": 20,
       "category_success": 0.8,
-      "composite": 0.8701909004394885
+      "composite": 0.8504634254672971
     },
     {
       "category": "short_input",
       "n": 15,
       "category_success": 1.0,
-      "composite": 0.9760568445270691
+      "composite": 0.9705012889715136
     },
     {
       "category": "single_filler",
@@ -68,7 +68,7 @@
       "category": "spoken_numbers_dates",
       "n": 15,
       "category_success": 0.9333333333333333,
-      "composite": 0.9484372024834372
+      "composite": 0.939177943224178
     },
     {
       "category": "stacked_fillers",
@@ -92,11 +92,11 @@
       "category": "word_false_start",
       "n": 15,
       "category_success": 0.8,
-      "composite": 0.8304837237817541
+      "composite": 0.8686318719299021
     }
   ],
   "disqualifications": [
-    "hallucinator: WRR<0.85 on 24/250 (9.6%)",
+    "hallucinator: WRR<0.85 on 14/250 (5.6%)",
     "changes-meaning: self-correction failures on 47/50 (94.0%)"
   ]
 }

@@ -31,6 +31,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip", default="", help="comma-separated candidates to skip")
     ap.add_argument("--only", default="", help="comma-separated candidates to run")
+    ap.add_argument("--strategy", default="prod-v13", help="prompt strategy")
     ap.add_argument("--limit", type=int, default=None, help="cases per candidate")
     args = ap.parse_args()
 
@@ -52,7 +53,7 @@ def main():
             continue
         try:
             t0 = time.time()
-            run_dir = runner.run_candidate(name, args.limit, greedy=False)
+            run_dir = runner.run_candidate(name, args.limit, greedy=False, strategy_name=args.strategy)
             elapsed = time.time() - t0
             summary = report.report(run_dir)
             summary["wall_seconds"] = elapsed

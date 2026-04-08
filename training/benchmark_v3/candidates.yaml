@@ -33,6 +33,24 @@ candidates:
       top_k: 20
       min_p: 0.0
 
+  qwen2.5-3b:
+    # The actual production model from v1.2.5 — the user's last known
+    # working configuration. Reference baseline for "what worked before".
+    binary: C:/Users/dutch/AppData/Roaming/com.chirp.app/llm/llama-server.exe
+    model:  C:/Users/dutch/chirp-bench/models/qwen2.5-3b/qwen2.5-3b-instruct-q4_k_m.gguf
+    model_id: qwen2.5-3b
+    ctx_size: 2048
+    n_predict: 512
+    gpu_layers: 99
+    reasoning_budget: 0
+    sampling:
+      # Qwen 2.5 has no thinking mode — these are the official model card
+      # recommended sampler settings.
+      temperature: 0.7
+      top_p: 0.8
+      top_k: 20
+      min_p: 0.0
+
   qwen3-1.7b:
     # NOTE: Qwen did NOT release a 2507-update for the 1.7B size — the
     # original Qwen3-1.7B is the only option. Has thinking mode by default

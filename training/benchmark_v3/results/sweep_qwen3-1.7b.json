@@ -1,0 +1,522 @@
+[
+  {
+    "candidate": "qwen3-1.7b",
+    "timestamp": "prod-v13-20260408-021244",
+    "n_cases": 250,
+    "composite_mean": 0.7012422362661929,
+    "composite_ci_low": 0.661304162444286,
+    "composite_ci_high": 0.7392672685439491,
+    "category_success_mean": 0.572,
+    "ttlt_p50_ms": 66.90239906311035,
+    "ttlt_p95_ms": 115.27442932128906,
+    "ttlt_p99_ms": 139.45317268371582,
+    "by_category": [
+      {
+        "category": "adversarial_paraphrase_trap",
+        "n": 10,
+        "category_success": 1.0,
+        "composite": 0.998811646802016
+      },
+      {
+        "category": "cross_sentence_self_correction",
+        "n": 10,
+        "category_success": 0.0,
+        "composite": 0.35168488710703716
+      },
+      {
+        "category": "explicit_self_correction",
+        "n": 25,
+        "category_success": 0.0,
+        "composite": 0.34351683696639795
+      },
+      {
+        "category": "identity_clean",
+        "n": 30,
+        "category_success": 1.0,
+        "composite": 0.9993823814055457
+      },
+      {
+        "category": "implicit_self_correction",
+        "n": 15,
+        "category_success": 0.0,
+        "composite": 0.3535998949357822
+      },
+      {
+        "category": "long_multi_sentence",
+        "n": 20,
+        "category_success": 0.9,
+        "composite": 0.8292241429380158
+      },
+      {
+        "category": "proper_nouns",
+        "n": 20,
+        "category_success": 0.95,
+        "composite": 0.9824654504151704
+      },
+      {
+        "category": "short_input",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 1.0
+      },
+      {
+        "category": "single_filler",
+        "n": 25,
+        "category_success": 0.08,
+        "composite": 0.39217773893537566
+      },
+      {
+        "category": "spoken_numbers_dates",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 1.0
+      },
+      {
+        "category": "stacked_fillers",
+        "n": 15,
+        "category_success": 0.0,
+        "composite": 0.356393901710454
+      },
+      {
+        "category": "stutter_repetition",
+        "n": 20,
+        "category_success": 0.55,
+        "composite": 0.7195124155176119
+      },
+      {
+        "category": "technical_vocab",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 0.9438349504798029
+      },
+      {
+        "category": "word_false_start",
+        "n": 15,
+        "category_success": 0.5333333333333333,
+        "composite": 0.5333524335626945
+      }
+    ],
+    "disqualifications": [
+      "changes-meaning: self-correction failures on 50/50 (100.0%)"
+    ],
+    "strategy": "prod-v13",
+    "wall_seconds": 19.758079051971436
+  },
+  {
+    "candidate": "qwen3-1.7b",
+    "timestamp": "prod-v13-fewshot-20260408-021304",
+    "n_cases": 250,
+    "composite_mean": 0.7299041839639758,
+    "composite_ci_low": 0.6937539946328712,
+    "composite_ci_high": 0.7686562439105802,
+    "category_success_mean": 0.612,
+    "ttlt_p50_ms": 68.06778907775879,
+    "ttlt_p95_ms": 116.62054061889648,
+    "ttlt_p99_ms": 147.60613441467285,
+    "by_category": [
+      {
+        "category": "adversarial_paraphrase_trap",
+        "n": 10,
+        "category_success": 1.0,
+        "composite": 1.0
+      },
+      {
+        "category": "cross_sentence_self_correction",
+        "n": 10,
+        "category_success": 0.0,
+        "composite": 0.3516123984405677
+      },
+      {
+        "category": "explicit_self_correction",
+        "n": 25,
+        "category_success": 0.28,
+        "composite": 0.504654178808587
+      },
+      {
+        "category": "identity_clean",
+        "n": 30,
+        "category_success": 1.0,
+        "composite": 0.9996943148678246
+      },
+      {
+        "category": "implicit_self_correction",
+        "n": 15,
+        "category_success": 0.0,
+        "composite": 0.3535998949357822
+      },
+      {
+        "category": "long_multi_sentence",
+        "n": 20,
+        "category_success": 0.85,
+        "composite": 0.8089801740918752
+      },
+      {
+        "category": "proper_nouns",
+        "n": 20,
+        "category_success": 0.95,
+        "composite": 0.9824654504151704
+      },
+      {
+        "category": "short_input",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 0.957977314732181
+      },
+      {
+        "category": "single_filler",
+        "n": 25,
+        "category_success": 0.12,
+        "composite": 0.41809187803838666
+      },
+      {
+        "category": "spoken_numbers_dates",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 0.9688196389780053
+      },
+      {
+        "category": "stacked_fillers",
+        "n": 15,
+        "category_success": 0.0,
+        "composite": 0.3570933950664011
+      },
+      {
+        "category": "stutter_repetition",
+        "n": 20,
+        "category_success": 0.9,
+        "composite": 0.9379002696510051
+      },
+      {
+        "category": "technical_vocab",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 0.9731769976969266
+      },
+      {
+        "category": "word_false_start",
+        "n": 15,
+        "category_success": 0.26666666666666666,
+        "composite": 0.47690097567191564
+      }
+    ],
+    "disqualifications": [
+      "hallucinator: WRR<0.85 on 19/250 (7.6%)",
+      "changes-meaning: self-correction failures on 43/50 (86.0%)"
+    ],
+    "strategy": "prod-v13-fewshot",
+    "wall_seconds": 19.987762689590454
+  },
+  {
+    "candidate": "qwen3-1.7b",
+    "timestamp": "v125-json-20260408-021329",
+    "n_cases": 250,
+    "composite_mean": 0.7168314504210145,
+    "composite_ci_low": 0.6801430324602659,
+    "composite_ci_high": 0.7544600209798655,
+    "category_success_mean": 0.6,
+    "ttlt_p50_ms": 88.16695213317871,
+    "ttlt_p95_ms": 136.00683212280273,
+    "ttlt_p99_ms": 169.5268154144287,
+    "by_category": [
+      {
+        "category": "adversarial_paraphrase_trap",
+        "n": 10,
+        "category_success": 1.0,
+        "composite": 0.9708931113792895
+      },
+      {
+        "category": "cross_sentence_self_correction",
+        "n": 10,
+        "category_success": 0.0,
+        "composite": 0.35189437256952055
+      },
+      {
+        "category": "explicit_self_correction",
+        "n": 25,
+        "category_success": 0.12,
+        "composite": 0.4057668388533297
+      },
+      {
+        "category": "identity_clean",
+        "n": 30,
+        "category_success": 0.9666666666666667,
+        "composite": 0.9774481399002589
+      },
+      {
+        "category": "implicit_self_correction",
+        "n": 15,
+        "category_success": 0.0,
+        "composite": 0.3504835847643987
+      },
+      {
+        "category": "long_multi_sentence",
+        "n": 20,
+        "category_success": 0.8,
+        "composite": 0.7601422205213947
+      },
+      {
+        "category": "proper_nouns",
+        "n": 20,
+        "category_success": 0.95,
+        "composite": 0.9808706371073456
+      },
+      {
+        "category": "short_input",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 0.9890127304639357
+      },
+      {
+        "category": "single_filler",
+        "n": 25,
+        "category_success": 0.12,
+        "composite": 0.4137083786697224
+      },
+      {
+        "category": "spoken_numbers_dates",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 0.9530003425270276
+      },
+      {
+        "category": "stacked_fillers",
+        "n": 15,
+        "category_success": 0.0,
+        "composite": 0.35503839625141137
+      },
+      {
+        "category": "stutter_repetition",
+        "n": 20,
+        "category_success": 0.95,
+        "composite": 0.968946517207376
+      },
+      {
+        "category": "technical_vocab",
+        "n": 15,
+        "category_success": 0.8666666666666667,
+        "composite": 0.9111296995544549
+      },
+      {
+        "category": "word_false_start",
+        "n": 15,
+        "category_success": 0.5333333333333333,
+        "composite": 0.5727002887027121
+      }
+    ],
+    "disqualifications": [
+      "hallucinator: WRR<0.85 on 25/250 (10.0%)",
+      "changes-meaning: self-correction failures on 47/50 (94.0%)"
+    ],
+    "strategy": "v125-json",
+    "wall_seconds": 24.904886960983276
+  },
+  {
+    "candidate": "qwen3-1.7b",
+    "timestamp": "v125-improved-20260408-021354",
+    "n_cases": 250,
+    "composite_mean": 0.6931992900448078,
+    "composite_ci_low": 0.6549831894950335,
+    "composite_ci_high": 0.7342160056374624,
+    "category_success_mean": 0.588,
+    "ttlt_p50_ms": 88.26375007629395,
+    "ttlt_p95_ms": 136.30914688110352,
+    "ttlt_p99_ms": 173.77567291259766,
+    "by_category": [
+      {
+        "category": "adversarial_paraphrase_trap",
+        "n": 10,
+        "category_success": 0.8,
+        "composite": 0.8454263243960192
+      },
+      {
+        "category": "cross_sentence_self_correction",
+        "n": 10,
+        "category_success": 0.0,
+        "composite": 0.34804131348250844
+      },
+      {
+        "category": "explicit_self_correction",
+        "n": 25,
+        "category_success": 0.12,
+        "composite": 0.4107120554362986
+      },
+      {
+        "category": "identity_clean",
+        "n": 30,
+        "category_success": 1.0,
+        "composite": 0.9992111001357097
+      },
+      {
+        "category": "implicit_self_correction",
+        "n": 15,
+        "category_success": 0.13333333333333333,
+        "composite": 0.4329293157343436
+      },
+      {
+        "category": "long_multi_sentence",
+        "n": 20,
+        "category_success": 0.8,
+        "composite": 0.7601555533619498
+      },
+      {
+        "category": "proper_nouns",
+        "n": 20,
+        "category_success": 0.9,
+        "composite": 0.9491271536733918
+      },
+      {
+        "category": "short_input",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 0.927872714128146
+      },
+      {
+        "category": "single_filler",
+        "n": 25,
+        "category_success": 0.12,
+        "composite": 0.36641181085272473
+      },
+      {
+        "category": "spoken_numbers_dates",
+        "n": 15,
+        "category_success": 1.0,
+        "composite": 0.9793972878655818
+      },
+      {
+        "category": "stacked_fillers",
+        "n": 15,
+        "category_success": 0.0,
+        "composite": 0.25912264427766896
+      },
+      {
+        "category": "stutter_repetition",
+        "n": 20,
+        "category_success": 0.8,
+        "composite": 0.8747947140047216
+      },
+      {
+        "category": "technical_vocab",
+        "n": 15,
+        "category_success": 0.8666666666666667,
+        "composite": 0.8961931240139484
+      },
+      {
+        "category": "word_false_start",
+        "n": 15,
+        "category_success": 0.5333333333333333,
+        "composite": 0.5230961173348816
+      }
+    ],
+    "disqualifications": [
+      "hallucinator: WRR<0.85 on 38/250 (15.2%)",
+      "changes-meaning: self-correction failures on 45/50 (90.0%)"
+    ],
+    "strategy": "v125-improved",
+    "wall_seconds": 24.844608068466187
+  },
+  {
+    "candidate": "qwen3-1.7b",
+    "timestamp": "strict-format-20260408-021418",
+    "n_cases": 250,
+    "composite_mean": 0.3882088114934094,
+    "composite_ci_low": 0.34997187314356093,
+    "composite_ci_high": 0.4298030998234499,
+    "category_success_mean": 0.38,
+    "ttlt_p50_ms": 83.38642120361328,
+    "ttlt_p95_ms": 132.80868530273438,
+    "ttlt_p99_ms": 175.3387451171875,
+    "by_category": [
+      {
+        "category": "adversarial_paraphrase_trap",
+        "n": 10,
+        "category_success": 0.2,
+        "composite": 0.3106864627711291
+      },
+      {
+        "category": "cross_sentence_self_correction",
+        "n": 10,
+        "category_success": 0.0,
+        "composite": 0.26596507396012026
+      },
+      {
+        "category": "explicit_self_correction",
+        "n": 25,
+        "category_success": 0.12,
+        "composite": 0.250801567212861
+      },
+      {
+        "category": "identity_clean",
+        "n": 30,
+        "category_success": 0.2,
+        "composite": 0.3065744205138597
+      },
+      {
+        "category": "implicit_self_correction",
+        "n": 15,
+        "category_success": 0.06666666666666667,
+        "composite": 0.1584259316848456
+      },
+      {
+        "category": "long_multi_sentence",
+        "n": 20,
+        "category_success": 0.75,
+        "composite": 0.7161057670123409
+      },
+      {
+        "category": "proper_nouns",
+        "n": 20,
+        "category_success": 0.7,
+        "composite": 0.565489864193687
+      },
+      {
+        "category": "short_input",
+        "n": 15,
+        "category_success": 0.9333333333333333,
+        "composite": 0.6101431033665012
+      },
+      {
+        "category": "single_filler",
+        "n": 25,
+        "category_success": 0.24,
+        "composite": 0.24134566690010556
+      },
+      {
+        "category": "spoken_numbers_dates",
+        "n": 15,
+        "category_success": 0.6666666666666666,
+        "composite": 0.5233545376811961
+      },
+      {
+        "category": "stacked_fillers",
+        "n": 15,
+        "category_success": 0.06666666666666667,
+        "composite": 0.20435451345744007
+      },
+      {
+        "category": "stutter_repetition",
+        "n": 20,
+        "category_success": 0.55,
+        "composite": 0.5089585991121054
+      },
+      {
+        "category": "technical_vocab",
+        "n": 15,
+        "category_success": 0.6,
+        "composite": 0.48362534229455684
+      },
+      {
+        "category": "word_false_start",
+        "n": 15,
+        "category_success": 0.2,
+        "composite": 0.28500920027794313
+      }
+    ],
+    "disqualifications": [
+      "hallucinator: WRR<0.85 on 176/250 (70.4%)",
+      "paraphraser: LR-out-of-bounds on 127/250 (50.8%)",
+      "changes-meaning: self-correction failures on 46/50 (92.0%)"
+    ],
+    "strategy": "strict-format",
+    "wall_seconds": 23.765629053115845
+  }
+]
