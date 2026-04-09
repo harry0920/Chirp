@@ -1,0 +1,102 @@
+{
+  "candidate": "chirp-flan-t5-small",
+  "timestamp": "trained-prompt-20260408-024647",
+  "n_cases": 250,
+  "composite_mean": 0.7798246049925207,
+  "composite_ci_low": 0.7464786420691113,
+  "composite_ci_high": 0.8148916977695344,
+  "category_success_mean": 0.728,
+  "ttlt_p50_ms": 85.24036407470703,
+  "ttlt_p95_ms": 187.058687210083,
+  "ttlt_p99_ms": 279.4046401977539,
+  "by_category": [
+    {
+      "category": "adversarial_paraphrase_trap",
+      "n": 10,
+      "category_success": 0.1,
+      "composite": 0.34841381360916823
+    },
+    {
+      "category": "cross_sentence_self_correction",
+      "n": 10,
+      "category_success": 0.0,
+      "composite": 0.3242082261274898
+    },
+    {
+      "category": "explicit_self_correction",
+      "n": 25,
+      "category_success": 0.64,
+      "composite": 0.7205732741247296
+    },
+    {
+      "category": "identity_clean",
+      "n": 30,
+      "category_success": 0.9333333333333333,
+      "composite": 0.9574314999258602
+    },
+    {
+      "category": "implicit_self_correction",
+      "n": 15,
+      "category_success": 0.3333333333333333,
+      "composite": 0.5555886040069039
+    },
+    {
+      "category": "long_multi_sentence",
+      "n": 20,
+      "category_success": 0.85,
+      "composite": 0.7449447862042785
+    },
+    {
+      "category": "proper_nouns",
+      "n": 20,
+      "category_success": 0.95,
+      "composite": 0.9210660245586523
+    },
+    {
+      "category": "short_input",
+      "n": 15,
+      "category_success": 0.9333333333333333,
+      "composite": 0.9235586241071705
+    },
+    {
+      "category": "single_filler",
+      "n": 25,
+      "category_success": 0.56,
+      "composite": 0.6759019798302862
+    },
+    {
+      "category": "spoken_numbers_dates",
+      "n": 15,
+      "category_success": 0.9333333333333333,
+      "composite": 0.873252145835521
+    },
+    {
+      "category": "stacked_fillers",
+      "n": 15,
+      "category_success": 0.8,
+      "composite": 0.8601903954388491
+    },
+    {
+      "category": "stutter_repetition",
+      "n": 20,
+      "category_success": 0.8,
+      "composite": 0.8533508482026214
+    },
+    {
+      "category": "technical_vocab",
+      "n": 15,
+      "category_success": 0.8666666666666667,
+      "composite": 0.8232898138885915
+    },
+    {
+      "category": "word_false_start",
+      "n": 15,
+      "category_success": 0.8666666666666667,
+      "composite": 0.9113118383763881
+    }
+  ],
+  "disqualifications": [
+    "hallucinator: WRR<0.85 on 20/250 (8.0%)",
+    "changes-meaning: self-correction failures on 29/50 (58.0%)"
+  ]
+}

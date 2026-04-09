@@ -403,7 +403,14 @@ pub fn start(hotkey: &str, app_handle: AppHandle) -> Result<(), String> {
             });
 
             if let Err(e) = grab_result {
-                log::warn!("rdev::grab failed ({e:?}), falling back to rdev::listen()");
+                log::error!(
+                    "rdev::grab failed: {:?} — hotkey suppression DISABLED, hotkey will leak through to active app. Falling back to passive listen mode.",
+                    e
+                );
+                let _ = app.emit(
+                    "hotkey-grab-failed",
+                    serde_json::json!({ "reason": format!("{:?}", e) }),
+                );
                 let _ = app.emit("hotkey-status", "accessibility_required");
 
                 let combo_for_listen = combo;

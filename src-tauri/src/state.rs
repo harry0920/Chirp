@@ -89,7 +89,7 @@ impl Default for Settings {
             auto_dismiss_overlay: true,
             smart_formatting: true,
             input_device: "default".into(),
-            model: "parakeet-tdt-0.6b".into(),
+            model: "moonshine-base".into(),
             onboarding_complete: false,
             ai_cleanup: true,
             overlay_position: "bottom".into(),
@@ -201,6 +201,13 @@ pub struct AppState {
     pub history: Vec<TranscriptionEntry>,
     pub recording_state: RecordingState,
     pub recording_generation: u64,
+    /// True if the VAD receiver thread was successfully spawned for the
+    /// current/most-recent recording. Set in start_recording, checked in
+    /// stop_recording to decide whether to use VAD output or the chunked
+    /// fallback. Never decide based on vad_texts.is_empty() — a transient
+    /// receiver hiccup could leave it empty and cause the fallback to
+    /// re-transcribe the whole buffer, producing duplicated output.
+    pub vad_was_active: bool,
     pub hotkey_status: HotkeyStatus,
     /// Recognizer is in its own Arc so transcription can proceed without holding
     /// the main state lock. The sherpa C API is thread-safe (Send+Sync).
@@ -226,6 +233,7 @@ impl AppState {
             history,
             recording_state: RecordingState::Idle,
             recording_generation: 0,
+            vad_was_active: false,
             hotkey_status: HotkeyStatus::Idle,
             recognizer: None,
             recognizer_dirty: false,
@@ -248,6 +256,17 @@ pub type AudioBuffer = Arc<std::sync::Mutex<Vec<f32>>>;
 
 /// Accumulated transcripts from VAD segments, filled by receiver thread
 pub type VadTranscripts = Arc<std::sync::Mutex<Vec<String>>>;
+
+/// Accumulated per-segment CLEANED transcripts from VAD segments, filled by
+/// the receiver thread after it runs the full cleanup pipeline
+/// (regex + vocab + snippets + optional LLM) on each segment as it arrives.
+/// Joined in stop_recording and injected directly.
+///
+/// Newtype wrapper (not a type alias) so Tauri's state manager can
+/// distinguish it from `VadTranscripts` — both wrap the same inner type
+/// and Tauri keys state by the outer Rust type.
+#[derive(Default)]
+pub struct VadCleanedTranscripts(pub Arc<std::sync::Mutex<Vec<String>>>);
 
 /// Handle to the VAD receiver thread (joined on stop_recording)
 pub struct VadReceiverHandle(pub std::sync::Mutex<Option<std::thread::JoinHandle<()>>>);

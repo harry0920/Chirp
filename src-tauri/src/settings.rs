@@ -77,6 +77,8 @@ fn vocabulary_path() -> PathBuf {
 ///   - Qwen 2.5 3B GGUF (pre-Gemma)
 ///   - FLAN-T5 chirp-cleanup directory (pre-Gemma)
 ///   - Gemma 4 E2B GGUF (replaced by chirp-cleanup-v2 in v1.3.0)
+///   - chirp-cleanup-v2 fine-tune (replaced by stock Qwen3-0.6B-Instruct in v1.3.0)
+///   - Qwen3-0.6B GGUF (replaced by Ministral 3 8B in v1.3.0 dev — won the v3 benchmark)
 fn cleanup_old_models() {
     let llm_dir = config_dir().join("llm");
 
@@ -84,6 +86,8 @@ fn cleanup_old_models() {
         "qwen2.5-3b-instruct-q4_k_m.gguf",
         "gemma-4-e2b-it-q4_k_m.gguf",
         "gemma-4-E2B-it-Q4_K_M.gguf",
+        "chirp-cleanup-0.6b-q4_k_m.gguf",
+        "Qwen3-0.6B-Q4_K_M.gguf",
     ];
     for name in old_files {
         let path = llm_dir.join(name);

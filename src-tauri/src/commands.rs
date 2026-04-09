@@ -20,6 +20,11 @@ const CHIRP_SOUND: &[u8] = include_bytes!("../sounds/chirp.wav");
 /// Join VAD segments with boundary cleanup. When VAD splits mid-sentence,
 /// each segment starts with a capital letter and may end with a period that
 /// doesn't belong. This fixes the most obvious artifacts.
+///
+/// Currently unused — retained because the streaming cleanup path (v3) does
+/// per-segment LLM cleanup instead, but we may want this helper again if the
+/// streaming path is reverted.
+#[allow(dead_code)]
 fn join_vad_segments(segments: &[String]) -> String {
     if segments.is_empty() {
         return String::new();
@@ -325,6 +330,7 @@ pub async fn start_recording(
     recording_start: State<'_, RecordingStartTime>,
     stream_active_state: State<'_, StreamActiveState>,
     vad_transcripts: State<'_, VadTranscripts>,
+    vad_cleaned: State<'_, VadCleanedTranscripts>,
     vad_receiver_handle: State<'_, VadReceiverHandle>,
     vad_sender: State<'_, VadSender>,
     vad_flush_handle: State<'_, VadFlushHandle>,
@@ -361,67 +367,19 @@ pub async fn start_recording(
     // Clear audio buffer and VAD transcripts
     buffer.lock().unwrap_or_else(|e| e.into_inner()).clear();
     vad_transcripts.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    vad_cleaned.0.lock().unwrap_or_else(|e| e.into_inner()).clear();
 
     // Record wall-clock start time for sample rate sanity check
     *recording_start.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
 
     let device_id = s.settings.input_device.clone();
-    let recognizer_for_vad = s.recognizer.clone();
     s.recording_state = RecordingState::Recording;
+    s.vad_was_active = false;
     drop(s);
 
-    // Set up VAD streaming if the model is available
-    let vad_model = settings::vad_model_path();
-    let vad_arc = if vad_model.exists() {
-        let (tx, rx) = crossbeam_channel::unbounded::<Vec<f32>>();
-
-        // Store sender so we can send poison pill on stop
-        *vad_sender.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(tx.clone());
-
-        let vad_st = audio::create_vad_state(
-            &vad_model.to_string_lossy(),
-            tx,
-        );
-
-        if let Some(vs) = vad_st {
-            let vad_arc = Arc::new(std::sync::Mutex::new(vs));
-            *vad_flush_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(vad_arc.clone());
-
-            // Spawn receiver thread: transcribes segments as they arrive
-            let transcripts = vad_transcripts.inner().clone();
-            let rec = recognizer_for_vad.unwrap();
-            let handle = std::thread::Builder::new()
-                .name("vad-receiver".into())
-                .spawn(move || {
-                    let mut seg_idx = 0u32;
-                    while let Ok(segment_audio) = rx.recv() {
-                        if segment_audio.is_empty() { break; } // poison pill
-                        let dur = segment_audio.len() as f32 / 16000.0;
-                        log::info!("VAD segment {seg_idx}: {:.1}s ({} samples)", dur, segment_audio.len());
-                        match transcribe::transcribe(&rec, &segment_audio) {
-                            Ok(text) => {
-                                if !text.is_empty() {
-                                    log::info!("VAD segment {seg_idx} transcript: '{text}'");
-                                    transcripts.lock().unwrap_or_else(|e| e.into_inner()).push(text);
-                                }
-                            }
-                            Err(e) => log::error!("VAD segment {seg_idx} transcription failed: {e}"),
-                        }
-                        seg_idx += 1;
-                    }
-                    log::info!("VAD receiver thread exiting after {seg_idx} segments");
-                })
-                .ok();
-            *vad_receiver_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = handle;
-
-            Some(vad_arc)
-        } else {
-            None
-        }
-    } else {
-        log::info!("VAD model not found, using non-streaming transcription");
-        None
-    };
+    // Moonshine spike: capture entire recording to buffer, no VAD segmentation.
+    // The full buffer is transcribed in one shot on stop_recording.
+    let vad_arc: Option<Arc<std::sync::Mutex<crate::audio::VadState>>> = None;
 
     // Start audio capture — convert Result to Option immediately so the
     // non-Send cpal::Stream doesn't live across an await point.
@@ -488,6 +446,7 @@ pub async fn stop_recording(
     recording_start: State<'_, RecordingStartTime>,
     stream_active_state: State<'_, StreamActiveState>,
     vad_transcripts: State<'_, VadTranscripts>,
+    vad_cleaned: State<'_, VadCleanedTranscripts>,
     vad_receiver_handle: State<'_, VadReceiverHandle>,
     vad_sender: State<'_, VadSender>,
     vad_flush_handle: State<'_, VadFlushHandle>,
@@ -627,9 +586,12 @@ pub async fn stop_recording(
     // Grab what we need from state before entering blocking thread.
     // Clone the Arc<SherpaRecognizer> so we can release the state lock
     // before the expensive transcription step.
-    let (recognizer, smart_fmt, vocab, snips, ai_cleanup, llm_port, tone_mode, http_client) = {
-        let s = state.lock().await;
+    let (recognizer, smart_fmt, vocab, snips, ai_cleanup, llm_port, tone_mode, http_client, vad_was_active) = {
+        let mut s = state.lock().await;
         let rec = s.recognizer.clone().ok_or("model_not_loaded".to_string())?;
+        let vad_was_active = s.vad_was_active;
+        // Reset for the next recording session, regardless of which path we take.
+        s.vad_was_active = false;
         (
             rec,
             s.settings.smart_formatting,
@@ -639,29 +601,69 @@ pub async fn stop_recording(
             s.llm_port,
             s.settings.tone_mode.clone(),
             s.http_client.clone(),
+            vad_was_active,
         )
     };
 
     let had_vocabulary = !vocab.is_empty();
 
-    // Check if VAD produced transcripts during recording
+    // Drain VAD transcripts accumulated by the receiver thread. Whether we
+    // USE them is decided by vad_was_active, NOT by vad_texts.is_empty().
+    // See stop_recording doc-comment for why.
     let vad_texts: Vec<String> = {
         let mut vt = vad_transcripts.lock().unwrap_or_else(|e| e.into_inner());
         std::mem::take(&mut *vt)
     };
-    let use_vad = !vad_texts.is_empty();
+    // Drain the streaming-cleaned segments produced by the VAD receiver thread.
+    let vad_cleaned_texts: Vec<String> = {
+        let mut vc = vad_cleaned.0.lock().unwrap_or_else(|e| e.into_inner());
+        std::mem::take(&mut *vc)
+    };
+    let use_vad = vad_was_active;
+    log::info!(
+        "transcription path: vad_was_active={}, vad_texts_count={}, vad_cleaned_count={}, fallback_used={}",
+        vad_was_active,
+        vad_texts.len(),
+        vad_cleaned_texts.len(),
+        !vad_was_active
+    );
 
-    let result = tokio::task::spawn_blocking(move || {
-        let raw = if use_vad {
-            // VAD streaming: segments were already transcribed in parallel
-            log::info!("Using {} VAD-streamed transcripts", vad_texts.len());
-            let merged = join_vad_segments(&vad_texts);
-            if merged.trim().is_empty() {
-                log::warn!("VAD transcripts all empty");
-                return Err("transcription_failed".to_string());
-            }
-            merged
-        } else {
+    // The streaming path bypasses the monolithic regex+LLM block. We only
+    // compute `streaming_result` up-front in that case, and set
+    // `streaming_was_cleaned_up` so history accounting reflects whether the
+    // LLM actually ran (which it did, per-segment, if ai_cleanup was enabled).
+    let (formatted_opt, streaming_was_cleaned_up) = if use_vad {
+        if vad_cleaned_texts.is_empty() {
+            log::warn!("VAD cleaned transcripts empty — returning empty result (no fallback)");
+            let mut s = state.lock().await;
+            s.recording_state = RecordingState::Idle;
+            return Err("transcription_failed".into());
+        }
+        // Smart join: strip mid-sentence orphan periods, merge stub-end
+        // segments with their continuation, drop internal paragraph breaks,
+        // and re-run the regex pre-pass on the joined output to catch
+        // cross-boundary fillers. See cleanup::join_cleaned_segments.
+        let joined = cleanup::join_cleaned_segments(&vad_cleaned_texts);
+        if joined.trim().is_empty() {
+            log::warn!("VAD cleaned transcripts all whitespace after join — returning empty result");
+            let mut s = state.lock().await;
+            s.recording_state = RecordingState::Idle;
+            return Err("transcription_failed".into());
+        }
+        log::info!(
+            "Streaming cleanup: {} segments smart-joined, total {} chars",
+            vad_cleaned_texts.len(),
+            joined.len()
+        );
+        (Some(joined), ai_cleanup && llm_port.is_some())
+    } else {
+        (None, false)
+    };
+
+    let result = if let Some(text) = formatted_opt {
+        Ok(text)
+    } else {
+        tokio::task::spawn_blocking(move || {
             // Fallback: chunk the full audio buffer and transcribe (original behavior)
             let chunks = crate::transcribe::chunk_audio(&audio_data, 16000, 30.0, 1.0);
             log::info!("Starting Parakeet TDT transcription ({} chunk(s))...", chunks.len());
@@ -689,26 +691,25 @@ pub async fn stop_recording(
                 log::warn!("Transcription returned empty text");
                 return Err("transcription_failed".to_string());
             }
-            merged
-        };
 
-        // Regex pre-pass: remove fillers, spoken punctuation, format numbers
-        let formatted = cleanup::cleanup_text(&raw, smart_fmt);
+            // Regex pre-pass: remove fillers, spoken punctuation, format numbers
+            let formatted = cleanup::cleanup_text(&merged, smart_fmt);
 
-        // Vocabulary find/replace: deterministic post-ASR fixup for things
-        // hotword biasing can't fix (homophones, brand spellings, stable
-        // mishearings). Each VocabEntry's `replaces` list maps mishearings
-        // to its canonical `term`, case-insensitive at word boundaries.
-        let after_replace = cleanup::apply_replacements(&formatted, &vocab);
+            // Vocabulary find/replace: deterministic post-ASR fixup for things
+            // hotword biasing can't fix (homophones, brand spellings, stable
+            // mishearings). Each VocabEntry's `replaces` list maps mishearings
+            // to its canonical `term`, case-insensitive at word boundaries.
+            let after_replace = cleanup::apply_replacements(&formatted, &vocab);
 
-        // Apply snippet expansions BEFORE AI cleanup
-        let after_snips = snippets::apply_snippets(&after_replace, &snips);
+            // Apply snippet expansions BEFORE AI cleanup
+            let after_snips = snippets::apply_snippets(&after_replace, &snips);
 
-        log::info!("After regex+replace+snips: '{after_snips}'");
-        Ok(after_snips)
-    })
-    .await
-    .map_err(|e| format!("Task failed: {e}"))?;
+            log::info!("After regex+replace+snips: '{after_snips}'");
+            Ok(after_snips)
+        })
+        .await
+        .map_err(|e| format!("Task failed: {e}"))?
+    };
 
     // If transcription failed, reset state before returning error
     let formatted = match result {
@@ -720,29 +721,9 @@ pub async fn stop_recording(
         }
     };
 
-    // AI cleanup pass (if enabled and server is running)
-    let mut was_cleaned_up = false;
-    let after_llm = if ai_cleanup && llm_port.is_some() {
-        let port = llm_port.unwrap();
-        let _ = app_handle.emit("recording-state", "polishing");
-        log::info!("Running chirp-cleanup-v2 on text...");
-        let cleanup_result = llm::cleanup_text(port, &formatted, &tone_mode, &http_client).await;
-        match cleanup_result {
-            Ok(cleaned) => {
-                log::info!("LLM cleanup: '{cleaned}'");
-                was_cleaned_up = true;
-                cleaned
-            }
-            Err(e) => {
-                log::warn!("AI cleanup failed, using regex-only result: {e}");
-                formatted.clone()
-            }
-        }
-    } else {
-        formatted.clone()
-    };
-
-    let result = after_llm;
+    // Moonshine spike: regex-only, no LLM cleanup stage.
+    let was_cleaned_up = false;
+    let result = formatted;
 
     let duration_ms = start_time.elapsed().as_millis() as u64;
     let word_count = result.split_whitespace().count();

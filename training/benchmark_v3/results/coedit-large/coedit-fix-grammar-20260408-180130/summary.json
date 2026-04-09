@@ -1,0 +1,102 @@
+{
+  "candidate": "coedit-large",
+  "timestamp": "coedit-fix-grammar-20260408-180130",
+  "n_cases": 250,
+  "composite_mean": 0.49874486809486807,
+  "composite_ci_low": 0.46556134112800784,
+  "composite_ci_high": 0.5347038560205227,
+  "category_success_mean": 0.488,
+  "ttlt_p50_ms": 333.9841365814209,
+  "ttlt_p95_ms": 725.4114151000977,
+  "ttlt_p99_ms": 1030.2600860595703,
+  "by_category": [
+    {
+      "category": "adversarial_paraphrase_trap",
+      "n": 10,
+      "category_success": 0.9,
+      "composite": 0.7722222222222223
+    },
+    {
+      "category": "cross_sentence_self_correction",
+      "n": 10,
+      "category_success": 0.0,
+      "composite": 0.21825854700854702
+    },
+    {
+      "category": "explicit_self_correction",
+      "n": 25,
+      "category_success": 0.0,
+      "composite": 0.22
+    },
+    {
+      "category": "identity_clean",
+      "n": 30,
+      "category_success": 0.8666666666666667,
+      "composite": 0.7468518518518519
+    },
+    {
+      "category": "implicit_self_correction",
+      "n": 15,
+      "category_success": 0.0,
+      "composite": 0.2222222222222222
+    },
+    {
+      "category": "long_multi_sentence",
+      "n": 20,
+      "category_success": 0.8,
+      "composite": 0.5536075036075037
+    },
+    {
+      "category": "proper_nouns",
+      "n": 20,
+      "category_success": 0.85,
+      "composite": 0.7267361111111111
+    },
+    {
+      "category": "short_input",
+      "n": 15,
+      "category_success": 0.8,
+      "composite": 0.6967592592592593
+    },
+    {
+      "category": "single_filler",
+      "n": 25,
+      "category_success": 0.08,
+      "composite": 0.24333333333333332
+    },
+    {
+      "category": "spoken_numbers_dates",
+      "n": 15,
+      "category_success": 1.0,
+      "composite": 0.812037037037037
+    },
+    {
+      "category": "stacked_fillers",
+      "n": 15,
+      "category_success": 0.0,
+      "composite": 0.23209876543209876
+    },
+    {
+      "category": "stutter_repetition",
+      "n": 20,
+      "category_success": 0.3,
+      "composite": 0.40805555555555556
+    },
+    {
+      "category": "technical_vocab",
+      "n": 15,
+      "category_success": 1.0,
+      "composite": 0.8148148148148149
+    },
+    {
+      "category": "word_false_start",
+      "n": 15,
+      "category_success": 0.26666666666666666,
+      "composite": 0.357037037037037
+    }
+  ],
+  "disqualifications": [
+    "hallucinator: WRR<0.85 on 19/250 (7.6%)",
+    "changes-meaning: self-correction failures on 50/50 (100.0%)"
+  ]
+}

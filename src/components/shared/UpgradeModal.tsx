@@ -67,23 +67,22 @@ export function UpgradeModal() {
           </div>
 
           <h2 className="mt-3 font-display font-extrabold text-[24px] text-dm-primary leading-tight text-center px-8">
-            Smart Cleanup
+            Enable
             <br />
-            just got smarter
+            Smart Cleanup
           </h2>
         </div>
 
         <div className="px-8 pb-8">
           <div className="flex flex-col items-center text-center">
             <p className="font-body text-[14px] text-dm-muted leading-relaxed">
-              We've upgraded to our own
-              {' '}<span className="font-semibold text-dm-primary">Chirp Cleanup v2</span> model —
-              fine-tuned specifically for dictation, faster, smaller,
-              and more accurate than general-purpose LLMs.
+              Smart Cleanup uses a small on-device language model to remove
+              filler words, fix stutters, and resolve self-corrections in
+              your dictations — all without sending audio anywhere.
             </p>
 
             <p className="mt-6 font-body text-[12px] text-dm-secondary">
-              One-time download · About 400 MB · 100% on-device
+              One-time download · About 380 MB · 100% on-device
             </p>
 
             {/* Progress bar */}

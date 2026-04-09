@@ -16,8 +16,6 @@ unsafe impl Send for SavedClipboard {}
 
 /// Registered clipboard format IDs (cached)
 struct FormatIds {
-    html: u32,
-    rtf: u32,
     exclude_monitoring: u32,
     exclude_history: u32,
     exclude_cloud: u32,
@@ -27,8 +25,6 @@ fn format_ids() -> &'static FormatIds {
     static IDS: OnceLock<FormatIds> = OnceLock::new();
     IDS.get_or_init(|| unsafe {
         FormatIds {
-            html: RegisterClipboardFormatW(wide_str("HTML Format").as_ptr()),
-            rtf: RegisterClipboardFormatW(wide_str("Rich Text Format").as_ptr()),
             exclude_monitoring: RegisterClipboardFormatW(
                 wide_str("ExcludeClipboardContentFromMonitorProcessing").as_ptr(),
             ),
@@ -107,12 +103,8 @@ pub fn save_clipboard() -> Result<SavedClipboard, String> {
     }
 }
 
-/// Set clipboard with plain text, optional HTML/RTF, and exclusion flags
-pub fn set_clipboard_with_exclusion(
-    plain: &str,
-    html: Option<&str>,
-    rtf: Option<&str>,
-) -> Result<(), String> {
+/// Set clipboard with plain text and exclusion flags
+pub fn set_clipboard_with_exclusion(plain: &str) -> Result<(), String> {
     let ids = format_ids();
 
     unsafe {
@@ -129,24 +121,6 @@ pub fn set_clipboard_with_exclusion(
         if SetClipboardData(CF_UNICODETEXT, h).is_null() {
             CloseClipboard();
             return Err("SetClipboardData CF_UNICODETEXT failed".into());
-        }
-
-        // CF_HTML (null-terminated UTF-8)
-        if let Some(html_str) = html {
-            let mut html_bytes = html_str.as_bytes().to_vec();
-            html_bytes.push(0);
-            if let Ok(h) = alloc_global(&html_bytes) {
-                SetClipboardData(ids.html, h);
-            }
-        }
-
-        // CF_RTF (null-terminated)
-        if let Some(rtf_str) = rtf {
-            let mut rtf_bytes = rtf_str.as_bytes().to_vec();
-            rtf_bytes.push(0);
-            if let Ok(h) = alloc_global(&rtf_bytes) {
-                SetClipboardData(ids.rtf, h);
-            }
         }
 
         // Exclusion flags — each is a DWORD(0)

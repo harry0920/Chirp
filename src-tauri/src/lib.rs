@@ -8,7 +8,6 @@ mod history;
 mod clipboard_win;
 mod inject;
 mod llm;
-mod richtext;
 mod hotkey;
 #[cfg(target_os = "macos")]
 mod native_hotkey;
@@ -19,7 +18,7 @@ mod transcribe;
 
 
 use commands::{RecordingStartTime, ResamplerFlushState, StreamActiveState, StreamErrorState, StreamHandle};
-use state::{AppState, AudioBuffer, SharedState, VadFlushHandle, VadReceiverHandle, VadSender, VadTranscripts};
+use state::{AppState, AudioBuffer, SharedState, VadCleanedTranscripts, VadFlushHandle, VadReceiverHandle, VadSender, VadTranscripts};
 use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -134,6 +133,7 @@ pub fn run() {
         .manage(RecordingStartTime(std::sync::Mutex::new(None)))
         .manage(StreamActiveState(std::sync::Mutex::new(None)))
         .manage::<VadTranscripts>(Arc::new(std::sync::Mutex::new(Vec::new())))
+        .manage(VadCleanedTranscripts(Arc::new(std::sync::Mutex::new(Vec::new()))))
         .manage(VadReceiverHandle(std::sync::Mutex::new(None)))
         .manage(VadSender(std::sync::Mutex::new(None)))
         .manage(VadFlushHandle(std::sync::Mutex::new(None)))

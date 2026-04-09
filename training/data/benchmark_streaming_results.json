@@ -1,0 +1,197 @@
+{
+  "summary": {
+    "n": 5,
+    "mono": {
+      "retention": 0.6713210286980779,
+      "length_ratio": 0.6772642140468228,
+      "ms": 123.38824000107707
+    },
+    "stream_naive": {
+      "retention": 0.7732819093474832,
+      "length_ratio": 0.8025039018952063,
+      "ms": 218.30059999992955
+    },
+    "stream_smart": {
+      "retention": 0.7557841066037787,
+      "length_ratio": 0.7839397993311037
+    }
+  },
+  "results": [
+    {
+      "session": 1,
+      "n_segments": 3,
+      "raw_joined": "Yeah, works great. I like what you're doing here. Um The Vocab tab just for user experience. Maybe just add like a little drop down. That adds The like replace words with this word. Logic. You can just like put them all there and like separate them with commas, maybe. Um let me know your thoughts on that strategy. I think everything else looks good. Um I'd probably just do it. Before the LLM only? In the regex.",
+      "after_regex": null,
+      "production_cleaned": null,
+      "mono": {
+        "out": "The Vocab tab just for user experience. Add a little dropdown to replace words with this word. Logic. Just like put them all there and like separate them with commas, maybe. Let me know your thoughts.",
+        "ms": 111.36940000142204,
+        "retention": 0.4918032786885246,
+        "length_ratio": 0.46153846153846156
+      },
+      "stream_naive": {
+        "outs_per_segment": [
+          "The Vocab tab could use a little dropdown for user experience.",
+          "The like replace words with this word. Logic. You can just like put them all there and like separate them with commas, maybe.\n\nUm let me know your thoughts on that strategy. I think everything else looks good.",
+          "Before the LLM: In the regex."
+        ],
+        "out_joined": "The Vocab tab could use a little dropdown for user experience. The like replace words with this word. Logic. You can just like put them all there and like separate them with commas, maybe.\n\nUm let me know your thoughts on that strategy. I think everything else looks good. Before the LLM: In the regex.",
+        "ms_total": 223.62880000218865,
+        "ms_per_segment": [
+          59.46899999980815,
+          110.26700000002165,
+          53.892800002358854
+        ],
+        "retention": 0.7377049180327869,
+        "length_ratio": 0.7051282051282052
+      },
+      "stream_smart": {
+        "out_joined": "The Vocab tab could use a little dropdown for user experience. The like replace words with this word. Logic. You can just like put them all there and like separate them with commas, maybe. let me know your thoughts on that strategy. I think everything else looks good. Before the LLM: In the regex.",
+        "retention": 0.7213114754098361,
+        "length_ratio": 0.6923076923076923
+      }
+    },
+    {
+      "session": 2,
+      "n_segments": 6,
+      "raw_joined": "Please analyse if this plan is feasible with our current setup. Um I know that we'll have to make it. More Um To make it actually inject the text with a specific keyboard to make it work. Other than that, analyze everything else that we would need to think about.",
+      "after_regex": "Please analyse if this plan is feasible with our current setup. I know that we'll have to make it. More to make it actually inject the text with a specific keyboard to make it work. Other than that, analyze everything else that we would need to think about.",
+      "production_cleaned": "Please analyse if this plan is feasible with our current setup. I know we'll have to make it. More to make it actually inject the text with a specific keyboard to make it work. Other than that, analyze everything else that we would need to think about.",
+      "mono": {
+        "out": "Please analyse if this plan is feasible with our current setup. I know we'll have to make it. More to make it actually inject the text with a specific keyboard to make it work. Other than that, analyze everything else that we would need to think about.",
+        "ms": 124.23019999914686,
+        "retention": 0.9743589743589743,
+        "length_ratio": 0.94
+      },
+      "stream_naive": {
+        "outs_per_segment": [
+          "Please analyse if this plan is feasible with our current setup.",
+          "Um I know we'll have to make it.",
+          "More",
+          "Um.",
+          "To make it actually work.",
+          "Inject the text with a specific keyboard to make it work. Other than that, analyze everything else that we would need to think about."
+        ],
+        "out_joined": "Please analyse if this plan is feasible with our current setup. Um I know we'll have to make it. More Um. To make it actually work. Inject the text with a specific keyboard to make it work. Other than that, analyze everything else that we would need to think about.",
+        "ms_total": 291.3181000003533,
+        "ms_per_segment": [
+          52.59429999932763,
+          54.60200000015902,
+          36.375799998495495,
+          29.635400002007373,
+          37.0705999994243,
+          81.04000000093947
+        ],
+        "retention": 1.0,
+        "length_ratio": 1.0
+      },
+      "stream_smart": {
+        "out_joined": "Please analyse if this plan is feasible with our current setup. I know we'll have to make it. More to make it actually work. Inject the text with a specific keyboard to make it work. Other than that, analyze everything else that we would need to think about.",
+        "retention": 0.9743589743589743,
+        "length_ratio": 0.96
+      }
+    },
+    {
+      "session": 3,
+      "n_segments": 3,
+      "raw_joined": "Don't do any coding at this part at this point in time. Just um See if it's viable. And if we can. Make it work.",
+      "after_regex": "Don't do any coding at this part at this point in time. Just see if it's viable. And if we can. Make it work.",
+      "production_cleaned": "Don't code at this point. Just check if it's viable and make it work.",
+      "mono": {
+        "out": "Don't code at this point. Just check if it's viable and make it work.",
+        "ms": 67.62760000128765,
+        "retention": 0.5454545454545454,
+        "length_ratio": 0.56
+      },
+      "stream_naive": {
+        "outs_per_segment": [
+          "Don't do any coding at this point in time. Just um.",
+          "See if it's viable. And if we can.",
+          "Make it work."
+        ],
+        "out_joined": "Don't do any coding at this point in time. Just um. See if it's viable. And if we can. Make it work.",
+        "ms_total": 146.74620000005234,
+        "ms_per_segment": [
+          52.06540000290261,
+          60.157099997013574,
+          34.52370000013616
+        ],
+        "retention": 0.9545454545454546,
+        "length_ratio": 0.88
+      },
+      "stream_smart": {
+        "out_joined": "Don't do any coding at this point in time. Just see if it's viable and if we can make it work.",
+        "retention": 0.9090909090909091,
+        "length_ratio": 0.84
+      }
+    },
+    {
+      "session": 4,
+      "n_segments": 4,
+      "raw_joined": "We are looking into fine tuning the chirp cleanup model. A little bit more. We've decided that we're gonna continue with our current clan architecture. thinking about what additional fine tuning or starting from scratch and fine-tuning with a better data set could get us in terms of better text cleanup right now it's fine but we seem to be over formatting and over correcting as well as missing some items on the benchmark So please do a deep dive into our code base and our training pipeline and look how feasible it is to train a V3 model.",
+      "after_regex": "We are looking into fine tuning the chirp cleanup model. A little bit more. We've decided that we're gonna continue with our current clan architecture. thinking about what additional fine tuning or starting from scratch and fine-tuning with a better data set could get us in terms of better text cleanup right now it's fine but we seem to be over formatting and over correcting as well as missing some items on the benchmark so please do a deep dive into our code base and our training pipeline and look how feasible it is to train a V3 model.",
+      "production_cleaned": null,
+      "mono": {
+        "out": "We're looking into fine-tuning the chirp cleanup model. A little more. We've decided to continue with our current clan architecture.\n\nWe've decided to continue with our current clan architecture. We're looking into what additional fine-tuning or starting from scratch with a better data set could get us in terms of better text cleanup right now. It's fine, but we seem to be over formatting and correcting as well as missing some items on the benchmark.\n\nPlease do a deep dive into our code base and training pipeline and look how feasible it is to train a V3",
+        "ms": 226.49460000320687,
+        "retention": 0.9090909090909091,
+        "length_ratio": 0.99
+      },
+      "stream_naive": {
+        "outs_per_segment": [
+          "We are looking into fine tuning the chirp cleanup model.",
+          "We've decided to continue with our current clan architecture.",
+          "Fine-tuning with a better data set could help, but we're also over-formating and correcting, and missing items on the benchmark. We need to start from scratch and fine-tune with a better dataset.",
+          "Deep dive into our codebase, training pipeline, and how feasible it is to train a V3 model."
+        ],
+        "out_joined": "We are looking into fine tuning the chirp cleanup model. We've decided to continue with our current clan architecture. Fine-tuning with a better data set could help, but we're also over-formating and correcting, and missing items on the benchmark. We need to start from scratch and fine-tune with a better dataset. Deep dive into our codebase, training pipeline, and how feasible it is to train a V3 model.",
+        "ms_total": 294.2347999996855,
+        "ms_per_segment": [
+          59.3406000007235,
+          54.35529999886057,
+          100.12920000008307,
+          80.40970000001835
+        ],
+        "retention": 0.5844155844155844,
+        "length_ratio": 0.71
+      },
+      "stream_smart": {
+        "out_joined": "We are looking into fine tuning the chirp cleanup model. We've decided to continue with our current clan architecture. Fine-tuning with a better data set could help, but we're also over-formating and correcting, and missing items on the benchmark. We need to start from scratch and fine-tune with a better dataset. Deep dive into our codebase, training pipeline, and how feasible it is to train a V3 model.",
+        "retention": 0.5844155844155844,
+        "length_ratio": 0.71
+      }
+    },
+    {
+      "session": 5,
+      "n_segments": 2,
+      "raw_joined": "This is a test of the chirp app after we just did a huge pipeline overhaul for the Text injection as well as some other pipelines and stuff. Just working on making sure we're not duplicating any text. And that everything is gonna run really good.",
+      "after_regex": "This is a test of the chirp app after we just did a huge pipeline overhaul for the text injection as well as some other pipelines and stuff. Just working on making sure we're not duplicating any text. And that everything is gonna run really good.",
+      "production_cleaned": "Chirp app: After a huge pipeline overhaul, we're working on making sure we're not duplicating text. Everything should run smoothly.",
+      "mono": {
+        "out": "Chirp app: After a huge pipeline overhaul, we're working on making sure we're not duplicating text. Everything should run smoothly.",
+        "ms": 87.21940000032191,
+        "retention": 0.4358974358974359,
+        "length_ratio": 0.43478260869565216
+      },
+      "stream_naive": {
+        "outs_per_segment": [
+          "Chirp app test: After we just did a huge pipeline overhaul for the.",
+          "Text injection, pipelines, and workflow. Just working on cleaning up the text and making sure nothing duplicates. And we're good."
+        ],
+        "out_joined": "Chirp app test: After we just did a huge pipeline overhaul for the. Text injection, pipelines, and workflow. Just working on cleaning up the text and making sure nothing duplicates. And we're good.",
+        "ms_total": 135.57509999736794,
+        "ms_per_segment": [
+          59.06279999908293,
+          76.51229999828502
+        ],
+        "retention": 0.5897435897435898,
+        "length_ratio": 0.717391304347826
+      },
+      "stream_smart": {
+        "out_joined": "Chirp app test: After we just did a huge pipeline overhaul for the Text injection, pipelines, and workflow. Just working on cleaning up the text and making sure nothing duplicates and we're good.",
+        "retention": 0.5897435897435898,
+        "length_ratio": 0.717391304347826
+      }
+    }
+  ]
+}
