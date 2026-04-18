@@ -76,18 +76,17 @@ fn vocabulary_path() -> PathBuf {
 /// Remove old cleanup-model files from previous versions:
 ///   - Qwen 2.5 3B GGUF (pre-Gemma)
 ///   - FLAN-T5 chirp-cleanup directory (pre-Gemma)
-///   - Gemma 4 E2B GGUF (replaced by chirp-cleanup-v2 in v1.3.0)
-///   - chirp-cleanup-v2 fine-tune (replaced by stock Qwen3-0.6B-Instruct in v1.3.0)
-///   - Qwen3-0.6B GGUF (replaced by Ministral 3 8B in v1.3.0 dev — won the v3 benchmark)
+///   - chirp-cleanup-v2 fine-tune (superseded)
+///   - Qwen3-0.6B GGUF (superseded)
+///   - Ministral 3 8B GGUF (tried in v1.3.0 dev, reverted to Gemma 4 E2B)
 fn cleanup_old_models() {
     let llm_dir = config_dir().join("llm");
 
     let old_files = [
         "qwen2.5-3b-instruct-q4_k_m.gguf",
-        "gemma-4-e2b-it-q4_k_m.gguf",
-        "gemma-4-E2B-it-Q4_K_M.gguf",
         "chirp-cleanup-0.6b-q4_k_m.gguf",
         "Qwen3-0.6B-Q4_K_M.gguf",
+        "Ministral-3-8B-Instruct-2512-Q4_K_M.gguf",
     ];
     for name in old_files {
         let path = llm_dir.join(name);
@@ -106,6 +105,17 @@ fn cleanup_old_models() {
             Err(e) => log::warn!("Failed to remove chirp-cleanup dir: {e}"),
         }
     }
+
+    // Shelved Moonshine streaming experiment — free ~272 MB on upgrade.
+    let moonshine_dir = models_dir()
+        .join("sherpa")
+        .join("sherpa-onnx-moonshine-base-en-int8");
+    if moonshine_dir.exists() {
+        match std::fs::remove_dir_all(&moonshine_dir) {
+            Ok(_) => log::info!("Cleaned up shelved Moonshine model dir"),
+            Err(e) => log::warn!("Failed to remove Moonshine model dir: {e}"),
+        }
+    }
 }
 
 /// Load settings from disk, returning defaults if file doesn't exist
@@ -119,9 +129,10 @@ pub fn load_settings() -> Settings {
         Err(_) => Settings::default(),
     };
 
-    // Migrate old whisper model IDs to new default
+    // Migrate old whisper model IDs and the shelved Moonshine experiment to
+    // the current default (Parakeet).
     match settings.model.as_str() {
-        "tiny" | "base" | "small" | "medium" => {
+        "tiny" | "base" | "small" | "medium" | "moonshine-base" => {
             settings.model = "parakeet-tdt-0.6b".into();
         }
         _ => {}

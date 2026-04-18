@@ -89,7 +89,7 @@ impl Default for Settings {
             auto_dismiss_overlay: true,
             smart_formatting: true,
             input_device: "default".into(),
-            model: "moonshine-base".into(),
+            model: "parakeet-tdt-0.6b".into(),
             onboarding_complete: false,
             ai_cleanup: true,
             overlay_position: "bottom".into(),

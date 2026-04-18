@@ -33,13 +33,12 @@ function getWindowLabel(): string {
 }
 
 export function App() {
-  const onboardingComplete = useAppStore((s) => s.onboardingComplete)
-  const settingsLoaded = useAppStore((s) => s.settingsLoaded)
   const windowLabel = getWindowLabel()
 
-  useSettingsSync()
-
-  // Overlay window — render immediately, no need to wait for settings
+  // Overlay window — owns its own lightweight sync, renders immediately.
+  // Running useSettingsSync here caused RUST-R crashes at cold start (IPC
+  // not ready when invoke fires from mount), surfacing as "Something went
+  // wrong" on the overlay pill.
   if (windowLabel === 'overlay') {
     return (
       <ErrorBoundary fallback="overlay">
@@ -48,7 +47,7 @@ export function App() {
     )
   }
 
-  // Tray popup window
+  // Tray popup window — same lightweight-sync rationale as overlay
   if (windowLabel === 'tray-popup') {
     return (
       <ErrorBoundary fallback="tray-popup">
@@ -57,12 +56,20 @@ export function App() {
     )
   }
 
+  return <SettingsRoot />
+}
+
+function SettingsRoot() {
+  const onboardingComplete = useAppStore((s) => s.onboardingComplete)
+  const settingsLoaded = useAppStore((s) => s.settingsLoaded)
+
+  useSettingsSync()
+
   // Wait for settings to load before deciding onboarding vs main app
   if (!settingsLoaded) {
     return null
   }
 
-  // Show onboarding if not complete
   if (!onboardingComplete) {
     return (
       <ErrorBoundary fallback="settings">
@@ -71,7 +78,6 @@ export function App() {
     )
   }
 
-  // Settings window (default)
   return (
     <ErrorBoundary fallback="settings">
       <Settings />

@@ -377,8 +377,7 @@ pub async fn start_recording(
     s.vad_was_active = false;
     drop(s);
 
-    // Moonshine spike: capture entire recording to buffer, no VAD segmentation.
-    // The full buffer is transcribed in one shot on stop_recording.
+    // Capture entire recording to buffer; transcribed in one shot on stop_recording.
     let vad_arc: Option<Arc<std::sync::Mutex<crate::audio::VadState>>> = None;
 
     // Start audio capture — convert Result to Option immediately so the
@@ -721,7 +720,7 @@ pub async fn stop_recording(
         }
     };
 
-    // Moonshine spike: regex-only, no LLM cleanup stage.
+    // Regex-only pipeline; LLM cleanup stage not wired in on this branch.
     let was_cleaned_up = false;
     let result = formatted;
 

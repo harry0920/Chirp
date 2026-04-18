@@ -7,6 +7,75 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [1.3.0] — Unreleased
 
+### 2026-04-18 — Overlay cold-start crash fix + Moonshine removal
+
+#### Fixed
+- **Overlay "Something went wrong" on cold start (Sentry RUST-R):** The
+  overlay window's settings-sync hook fired 6+ `invoke()` calls at mount.
+  When the Tauri IPC shim (`window.__TAURI_INTERNALS__`) wasn't ready yet
+  on cold start, those invokes rejected and the unhandled rejection
+  cascaded into the error boundary, showing "Something went wrong" and
+  preventing `hotkey-pressed` listeners from attaching — which also
+  explains the intermittent cold-start "hotkey not detected" reports
+  (workaround was toggling the hotkey in settings, which re-emitted state).
+- `src/hooks/useOverlaySync.ts` — new lightweight sync hook with
+  IPC-ready retry (20× × 100ms, detects `__TAURI_IPC__`/
+  `__TAURI_INTERNALS__` in error strings). Replaces the heavy
+  `useSettingsSync` on the overlay + tray-popup windows.
+- `src/App.tsx` — hoisted the window-label branch above
+  `useSettingsSync()` so the heavy sync hook only runs in the settings
+  window.
+
+#### Removed
+- **Moonshine ASR:** removed completely. Parakeet v3 TDT 0.6B is the
+  only ASR engine going forward.
+  - `src-tauri/src/transcribe.rs` — dropped
+    `OfflineMoonshineModelConfig` import, removed the `moonshine-base`
+    entry from `model_info()`, inlined the Parakeet path in
+    `load_model()` (no more `is_moonshine` branch).
+  - `src-tauri/src/state.rs` — default `model` flipped from
+    `moonshine-base` to `parakeet-tdt-0.6b`.
+  - `src-tauri/src/settings.rs` — migration now maps `moonshine-base`
+    (and the legacy whisper sizes) → `parakeet-tdt-0.6b`;
+    `cleanup_old_models()` deletes the `sherpa-onnx-moonshine-base-en-int8`
+    dir (~272 MB) on upgrade so existing v1.3.0-dev users reclaim disk.
+  - `src-tauri/src/commands.rs` — stale "Moonshine spike" comments
+    rewritten neutrally; behavior unchanged (capture entire recording,
+    no VAD segmentation on this branch).
+
+### 2026-04-11 — Revert Moonshine streaming, restore Parakeet v3 + Gemma 4 E2B
+
+#### Changed
+- **ASR:** Reverted the Moonshine streaming migration. Real-world
+  transcription quality regressed vs. Parakeet v3 + VAD streaming in
+  dogfooding, so the decision is to ship the known-good Parakeet path.
+  The Moonshine work is preserved at tag `archive/moonshine-migration`
+  for future reference.
+- **Cleanup LLM:** Swapped from Ministral 3 8B Instruct 2512 (5.2 GB)
+  back to Gemma 4 E2B Instruct (3.11 GB). Gemma's plain-text prompt
+  format with in-prompt few-shot examples is what shipped successfully
+  in v1.2.6; the Ministral swap was a v1.3.0 dev experiment.
+- `src-tauri/src/llm.rs`: model constants now point at
+  `gemma-4-E2B-it-Q4_K_M.gguf` via the unsloth GGUF mirror. Removed
+  Ministral-specific JSON-output + `<transcription>`-wrapper prompt
+  plumbing (`parse_cleaned_text`, `unwrap_cleaned_text`,
+  `raw_is_unsafe_fallback`, `tokenize_text`, few-shot chat-turn arrays).
+  Cleanup now sends a plain-text `{system, user}` chat and consumes
+  the response verbatim, with the length-guard prompt-injection defense
+  unchanged.
+- `src-tauri/src/settings.rs::cleanup_old_models`: added the stale
+  Ministral GGUF to the auto-cleanup list and removed Gemma from it
+  (Gemma is the active model again).
+
+#### Why
+- Mobile/MLX portability is a real constraint on the cleanup model, and
+  Gemma 4 E2B runs well on edge devices — Ministral 3 8B doesn't.
+  Picking Gemma now unblocks the mobile port later without forcing
+  another cleanup-model migration.
+- v3 benchmark numbers favored Ministral, but the benchmark is too
+  narrow to be a shipping signal on its own; real-world feel + mobile
+  constraints win for a today-ship.
+
 ### 2026-04-07 — Smart-join post-pass for streaming cleanup
 
 #### Changed

@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { Copy, Settings, LogOut, Check } from 'lucide-react'
 import { useAppStore, type TranscriptionEntry } from '../../stores/appStore'
-import { useSettingsSync } from '../../hooks/useSettingsSync'
+import { useOverlaySync } from '../../hooks/useOverlaySync'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
 import { formatHotkey, formatRelativeTime } from '../../lib/utils'
 import { BirdMark } from '../shared/BirdMark'
@@ -12,7 +12,7 @@ import { Toggle } from '../shared/Toggle'
 import { KeyBadge } from '../shared/KeyBadge'
 
 export function TrayPopup() {
-  useSettingsSync()
+  useOverlaySync()
 
   // Reload all state fresh from backend each time the popup is shown
   useEffect(() => {

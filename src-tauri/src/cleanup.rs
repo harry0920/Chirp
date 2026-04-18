@@ -26,6 +26,7 @@ struct CleanupRegexes {
     number_words: Vec<&'static str>,
     percentage: Regex,
     hundred_pct: Regex,
+    period_and: Regex,
 }
 
 fn regexes() -> &'static CleanupRegexes {
@@ -125,6 +126,7 @@ fn regexes() -> &'static CleanupRegexes {
             number_words: compiled_numbers,
             percentage: Regex::new(r"(?i)\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\s+percent\b").unwrap(),
             hundred_pct: Regex::new(r"(?i)\b(one )?hundred percent\b").unwrap(),
+            period_and: Regex::new(r"\.\s+And\b").unwrap(),
         }
     })
 }
@@ -295,6 +297,10 @@ fn format_spoken_patterns(text: &str) -> String {
 
     // Email pattern
     result = re.email.replace_all(&result, "$1@$2.$3").to_string();
+
+    // ". And" → ", and" — Parakeet often terminates a sentence before a
+    // conjunction that was actually a mid-sentence continuation.
+    result = re.period_and.replace_all(&result, ", and").to_string();
 
     result
 }
@@ -659,6 +665,12 @@ mod tests {
         // "new paragraph" should pass through to LLM as words, not be converted by regex
         let result = smart_format("hello new paragraph world");
         assert!(result.contains("new paragraph"));
+    }
+
+    #[test]
+    fn test_period_and_to_comma_and() {
+        let result = smart_format("I went to the store. And then I came home.");
+        assert_eq!(result, "I went to the store, and then I came home.");
     }
 
     #[test]

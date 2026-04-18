@@ -7,6 +7,7 @@ import { LogicalPosition, LogicalSize } from '@tauri-apps/api/dpi'
 import { useAppStore } from '../../stores/appStore'
 import { useAudio } from '../../hooks/useAudio'
 import { useRecording } from '../../hooks/useRecording'
+import { useOverlaySync } from '../../hooks/useOverlaySync'
 import { BirdMark } from '../shared/BirdMark'
 import { Listening } from './Listening'
 import { Processing } from './Processing'
@@ -146,6 +147,7 @@ export function Overlay() {
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; pillX: number; pillY: number } | null>(null)
   const originalPositionRef = useRef<{ x: number; y: number } | null>(null)
 
+  useOverlaySync()
   useAudio()
   useRecording()
 
