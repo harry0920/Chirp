@@ -28,12 +28,12 @@ export const STT_MODELS = [
 ]
 
 export const LLM_MODEL = {
-  name: 'Chirp Cleanup v2',
+  name: 'Qwen 2.5 3B Instruct',
   displayName: 'Smart Cleanup',
-  size: '397 MB',
-  friendlySize: 'About 400 MB',
-  description: 'Fine-tuned grammar and speech cleanup model. Faster and more accurate than general-purpose LLMs.',
-  attribution: 'Built on Qwen3 0.6B — Alibaba (Apache 2.0)',
+  size: '2.1 GB',
+  friendlySize: 'About 2.1 GB',
+  description: 'On-device language model that removes filler words, fixes stutters, and resolves self-corrections — all without sending audio anywhere.',
+  attribution: 'Built on Qwen 2.5 3B Instruct — Alibaba (Apache 2.0)',
 }
 
 export const CLEANUP_EXAMPLE = {

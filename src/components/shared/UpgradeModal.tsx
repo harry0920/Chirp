@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Sparkles, Download } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
+import { LLM_MODEL } from '../../lib/constants'
 import { BirdMark } from './BirdMark'
 import { Button } from './Button'
 
@@ -82,7 +83,7 @@ export function UpgradeModal() {
             </p>
 
             <p className="mt-6 font-body text-[12px] text-dm-secondary">
-              One-time download · About 380 MB · 100% on-device
+              One-time download · {LLM_MODEL.friendlySize} · 100% on-device
             </p>
 
             {/* Progress bar */}
