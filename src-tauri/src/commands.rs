@@ -763,9 +763,28 @@ pub async fn stop_recording(
         }
     };
 
-    // Regex-only pipeline; LLM cleanup stage not wired in on this branch.
-    let was_cleaned_up = false;
-    let result = formatted;
+    // AI cleanup pass (if enabled and server is running). The streaming/VAD
+    // path already ran the LLM per-segment and reports via
+    // streaming_was_cleaned_up; this block only runs on the fallback path.
+    let mut was_cleaned_up = streaming_was_cleaned_up;
+    let result = if !streaming_was_cleaned_up && ai_cleanup && llm_port.is_some() {
+        let port = llm_port.unwrap();
+        let _ = app_handle.emit("recording-state", "polishing");
+        log::info!("Running AI cleanup on text...");
+        match llm::cleanup_text(port, &formatted, &tone_mode, &http_client).await {
+            Ok(cleaned) => {
+                log::info!("LLM cleanup: '{cleaned}'");
+                was_cleaned_up = true;
+                cleaned
+            }
+            Err(e) => {
+                log::warn!("AI cleanup failed, using regex-only result: {e}");
+                formatted
+            }
+        }
+    } else {
+        formatted
+    };
 
     let duration_ms = start_time.elapsed().as_millis() as u64;
     let word_count = result.split_whitespace().count();
