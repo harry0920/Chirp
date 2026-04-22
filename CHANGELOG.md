@@ -7,6 +7,38 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [1.3.0] — Unreleased
 
+### 2026-04-21 — Hotkey rewrite, stuck-key fix, cleanup-LLM revert to Qwen 2.5
+
+#### Added
+- **Global hotkey rewrite (Windows):** split into two mechanisms —
+  Raw Input API for detection (`src-tauri/src/hotkey_raw_input.rs`)
+  and a low-level keyboard hook for suppression only
+  (`src-tauri/src/hotkey_ll_suppress.rs`). Detection reads modifier
+  state without interfering with normal keyboard processing; the
+  suppression hook only swallows downstream delivery of the configured
+  chord so the target app doesn't see it as a literal keypress.
+
+#### Fixed
+- **Stuck modifier after hotkey release:** the LL suppression hook
+  was swallowing key-ups whose key-downs it had not swallowed,
+  leaving target apps with a key they believed was still held
+  (e.g. Shift latched on after releasing the hotkey). The hook now
+  tracks swallowed presses in a HashSet and only suppresses matching
+  releases. Raw Input detection is unaffected, so Chirp still sees
+  the release cleanly.
+
+#### Changed
+- **Cleanup LLM reverted to Qwen 2.5 3B Instruct (v1.2.5 config):**
+  Gemma 4 E2B was introduced in v1.2.6 and carried through v1.3.0
+  dev, but Qwen 2.5 3B with JSON-schema output + datamarking is the
+  battle-tested cleanup path. `src-tauri/src/llm.rs` is restored
+  wholesale to the v1.2.5 version, with one signature tweak
+  (`cleanup_text` takes `&reqwest::Client` from the shared pool
+  instead of building its own). `llama-server` pinned back to
+  `b8429` to match. Users upgrading from v1.2.6 will have the old
+  `gemma-4-E2B-it-Q4_K_M.gguf` auto-removed on first run of the new
+  model downloader (~3.1 GB reclaimed).
+
 ### 2026-04-18 — Overlay cold-start crash fix + Moonshine removal
 
 #### Fixed
