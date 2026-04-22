@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Sparkles, Download } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
+import { useLlmDownloaded } from '../../hooks/useLlmDownloaded'
 import { LLM_MODEL } from '../../lib/constants'
 import { BirdMark } from './BirdMark'
 import { Button } from './Button'
@@ -11,6 +12,7 @@ export function UpgradeModal() {
   const tauri = useTauri()
   const upgradeModalOpen = useAppStore((s) => s.upgradeModalOpen)
   const setUpgradeModalOpen = useAppStore((s) => s.setUpgradeModalOpen)
+  const [, setLlmDownloaded] = useLlmDownloaded()
 
   const [downloading, setDownloading] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
@@ -24,6 +26,7 @@ export function UpgradeModal() {
     setProgress(0)
     try {
       await tauri.downloadLlm((p) => setProgress(p))
+      setLlmDownloaded(true)
 
       try {
         await tauri.startLlm()

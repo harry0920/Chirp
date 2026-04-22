@@ -56,6 +56,7 @@ export interface AppState {
   aiCleanup: boolean
   cleanupModel: string
   llmReady: boolean
+  llmDownloaded: boolean
 
   // Beam Search
   beamSearch: boolean
@@ -120,6 +121,7 @@ export interface AppState {
   setModelDownloadProgress: (progress: number | null) => void
   setLlmDownloadProgress: (progress: number | null) => void
   setLlmReady: (ready: boolean) => void
+  setLlmDownloaded: (downloaded: boolean) => void
   updateSettings: (partial: Partial<AppState>) => void
   addVocabularyEntry: (term: string) => void
   updateVocabularyEntry: (index: number, entry: VocabEntry) => void
@@ -169,6 +171,7 @@ export const useAppStore = create<AppState>((set) => ({
   aiCleanup: DEFAULT_SETTINGS.aiCleanup,
   cleanupModel: DEFAULT_SETTINGS.cleanupModel,
   llmReady: false,
+  llmDownloaded: false,
   llmDownloadProgress: null,
 
   // Beam Search
@@ -231,6 +234,7 @@ export const useAppStore = create<AppState>((set) => ({
   setModelDownloadProgress: (modelDownloadProgress) => set({ modelDownloadProgress }),
   setLlmDownloadProgress: (llmDownloadProgress) => set({ llmDownloadProgress }),
   setLlmReady: (llmReady) => set({ llmReady }),
+  setLlmDownloaded: (llmDownloaded) => set({ llmDownloaded }),
   updateSettings: (partial) => set(partial),
   addVocabularyEntry: (term) =>
     set((state) => ({
