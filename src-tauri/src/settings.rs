@@ -129,13 +129,16 @@ pub fn load_settings() -> Settings {
         Err(_) => Settings::default(),
     };
 
-    // Migrate old whisper model IDs and the shelved Moonshine experiment to
-    // the current default (Parakeet).
-    match settings.model.as_str() {
-        "tiny" | "base" | "small" | "medium" | "moonshine-base" => {
-            settings.model = "parakeet-tdt-0.6b".into();
-        }
-        _ => {}
+    // Migrate any non-current model identifier to the current default
+    // (Parakeet). Covers whisper tiny/base/small/medium and the shelved
+    // Moonshine experiment (moonshine-base, medium-streaming-en, etc.).
+    // Parakeet is the only supported ASR today; transcribe::model_info falls
+    // back to Parakeet for unknown ids anyway, but the stale string was
+    // leaking into log lines and the settings UI.
+    if settings.model != "parakeet-tdt-0.6b" {
+        log::info!("Migrated model '{}' → 'parakeet-tdt-0.6b'", settings.model);
+        settings.model = "parakeet-tdt-0.6b".into();
+        let _ = save_settings(&settings);
     }
 
     // Migrate old cleanup model to chirp-cleanup-v2 (fine-tuned Qwen3 0.6B)

@@ -126,6 +126,7 @@ export function useRecording() {
         }
       } catch (e) {
         const errMsg = String(e)
+        if (import.meta.env.DEV) console.error('stopAndProcess error:', errMsg)
         if (errMsg.includes('transcription_failed')) {
           setError('transcription_failed')
         } else if (errMsg.includes('injection_failed')) {
@@ -138,6 +139,7 @@ export function useRecording() {
 
     function handleStartError(e: unknown) {
       const errMsg = String(e)
+      if (import.meta.env.DEV) console.error('startRecording error:', errMsg)
       if (errMsg.includes('model_not_loaded')) {
         setError('model_not_loaded')
       } else if (errMsg.includes('mic_not_found')) {

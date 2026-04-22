@@ -9,6 +9,10 @@ mod clipboard_win;
 mod inject;
 mod llm;
 mod hotkey;
+#[cfg(target_os = "windows")]
+mod hotkey_raw_input;
+#[cfg(target_os = "windows")]
+mod hotkey_ll_suppress;
 #[cfg(target_os = "macos")]
 mod native_hotkey;
 mod settings;

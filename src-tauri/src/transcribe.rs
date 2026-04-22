@@ -106,7 +106,7 @@ pub fn load_model(
         let mut content = String::new();
         for term in &vocab_filtered {
             content.push_str(term);
-            content.push_str(" :3.0\n");
+            content.push('\n');
         }
         if let Err(e) = std::fs::write(&hotwords_path, content) {
             log::warn!("Failed to write hotwords file: {e}");
@@ -168,7 +168,7 @@ pub fn load_model(
         } else {
             None
         },
-        hotwords_score: if hotwords_active { 3.0 } else { 0.0 },
+        hotwords_score: if hotwords_active { 1.5 } else { 0.0 },
         ..Default::default()
     };
     OfflineRecognizer::create(&config)

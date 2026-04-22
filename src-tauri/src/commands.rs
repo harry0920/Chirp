@@ -335,11 +335,54 @@ pub async fn start_recording(
     vad_sender: State<'_, VadSender>,
     vad_flush_handle: State<'_, VadFlushHandle>,
 ) -> Result<(), String> {
-    let mut s = state.lock().await;
+    // Self-heal: if we're already in a Recording/Processing state, a prior
+    // session got stuck (e.g. stop_recording never fired due to a press/release
+    // race). Tear down the stale stream + buffer and proceed fresh rather than
+    // returning "Already recording" and stranding the user in a permanent
+    // error loop.
+    {
+        let mut s = state.lock().await;
+        if s.recording_state != RecordingState::Idle {
+            log::warn!(
+                "start_recording: state was {:?}, self-healing to Idle",
+                s.recording_state
+            );
+            s.recording_state = RecordingState::Idle;
+            drop(s);
 
-    if s.recording_state != RecordingState::Idle {
-        return Err("Already recording".into());
+            // Deactivate any zombie callbacks from the stale stream
+            {
+                let active = stream_active_state.0.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(ref flag) = *active {
+                    flag.store(false, Ordering::SeqCst);
+                }
+            }
+            // Drop the stale stream
+            {
+                let mut handle = stream_handle.0.lock().unwrap_or_else(|e| e.into_inner());
+                *handle = None;
+            }
+            // Drain any pending VAD shutdown state
+            {
+                let mut sender = vad_sender.0.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(tx) = sender.take() {
+                    let _ = tx.send(Vec::new());
+                }
+            }
+            {
+                let mut handle = vad_receiver_handle.0.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(h) = handle.take() {
+                    let _ = h.join();
+                }
+            }
+            {
+                let mut flush = vad_flush_handle.0.lock().unwrap_or_else(|e| e.into_inner());
+                *flush = None;
+            }
+        }
     }
+
+    let mut s = state.lock().await;
 
     // Check model is loaded
     if s.recognizer.is_none() {

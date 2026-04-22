@@ -6,6 +6,35 @@ use windows_sys::Win32::System::Memory::*;
 
 const CF_UNICODETEXT: u32 = 13;
 
+/// Return true if a clipboard format's data is stored as an HGLOBAL handle
+/// (safe to pass to GlobalSize/GlobalLock/SetClipboardData via GlobalAlloc).
+/// Formats backed by GDI handles (CF_BITMAP, CF_METAFILEPICT, CF_PALETTE,
+/// CF_ENHMETAFILE, DSP* variants) will cause heap corruption if treated as
+/// HGLOBAL. Private (0x0200-0x02FF) and GDIOBJ (0x0300-0x03FF) ranges are
+/// owner-defined and skipped. Registered formats (>= 0xC000) are HGLOBAL
+/// by contract.
+fn is_hglobal_format(fmt: u32) -> bool {
+    match fmt {
+        // Standard HGLOBAL-backed formats
+        1    // CF_TEXT
+        | 4  // CF_SYLK
+        | 5  // CF_DIF
+        | 6  // CF_TIFF
+        | 7  // CF_OEMTEXT
+        | 8  // CF_DIB
+        | 11 // CF_RIFF
+        | 12 // CF_WAVE
+        | 13 // CF_UNICODETEXT
+        | 15 // CF_HDROP
+        | 16 // CF_LOCALE
+        | 17 // CF_DIBV5
+        => true,
+        // Registered formats are always HGLOBAL
+        0xC000..=0xFFFF => true,
+        _ => false,
+    }
+}
+
 /// Saved clipboard state for restore after paste
 pub struct SavedClipboard {
     formats: Vec<(u32, Vec<u8>)>,
@@ -81,6 +110,10 @@ pub fn save_clipboard() -> Result<SavedClipboard, String> {
         let mut formats = Vec::new();
         let mut fmt = EnumClipboardFormats(0);
         while fmt != 0 {
+            if !is_hglobal_format(fmt) {
+                fmt = EnumClipboardFormats(fmt);
+                continue;
+            }
             let h = GetClipboardData(fmt);
             if !h.is_null() {
                 let size = GlobalSize(h);
