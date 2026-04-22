@@ -19,7 +19,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
-    UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL,
+    UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP,
+    WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
 struct HookConfig {
@@ -31,8 +32,19 @@ static HOOK_CONFIG: OnceLock<Mutex<Option<HookConfig>>> = OnceLock::new();
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
 static THREAD_HANDLE: Mutex<Option<std::thread::JoinHandle<()>>> = Mutex::new(None);
 
+/// VKs whose *down* event we actually swallowed. On key-up we only suppress
+/// releases that match a swallowed press — otherwise we let the up through so
+/// the target app doesn't end up thinking the key is still held (stuck
+/// modifier bug). Raw Input (detection) is unaffected by LL suppression, so
+/// the Rust side still sees the release cleanly.
+static SUPPRESSED_DOWN: OnceLock<Mutex<HashSet<u16>>> = OnceLock::new();
+
 fn config_slot() -> &'static Mutex<Option<HookConfig>> {
     HOOK_CONFIG.get_or_init(|| Mutex::new(None))
+}
+
+fn suppressed_down() -> &'static Mutex<HashSet<u16>> {
+    SUPPRESSED_DOWN.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
 pub fn start(
@@ -81,6 +93,9 @@ pub fn stop() {
     if let Ok(mut slot) = config_slot().lock() {
         *slot = None;
     }
+    if let Ok(mut set) = suppressed_down().lock() {
+        set.clear();
+    }
     if let Ok(mut guard) = THREAD_HANDLE.lock() {
         *guard = None;
     }
@@ -108,18 +123,42 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
     };
     let resolved = if resolved == 0 { vk } else { resolved };
 
-    let should_suppress = if let Ok(slot) = config_slot().lock() {
-        if let Some(cfg) = slot.as_ref() {
-            cfg.active_combo.load() && cfg.vk_set.contains(&resolved)
+    // Distinguish press vs release. Suppressing a release whose press we let
+    // through would leave the target app with a "stuck" key — it saw the
+    // down but never the up. So the rule is: only suppress a release if we
+    // actually suppressed its matching press.
+    let msg = wparam as u32;
+    let is_release = matches!(msg, WM_KEYUP | WM_SYSKEYUP);
+    let is_press = matches!(msg, WM_KEYDOWN | WM_SYSKEYDOWN);
+
+    if is_release {
+        let had_suppressed_down = suppressed_down()
+            .lock()
+            .map(|mut set| set.remove(&resolved))
+            .unwrap_or(false);
+        if had_suppressed_down {
+            return 1;
+        }
+        return CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam);
+    }
+
+    if is_press {
+        let should_suppress = if let Ok(slot) = config_slot().lock() {
+            if let Some(cfg) = slot.as_ref() {
+                cfg.active_combo.load() && cfg.vk_set.contains(&resolved)
+            } else {
+                false
+            }
         } else {
             false
+        };
+        if should_suppress {
+            if let Ok(mut set) = suppressed_down().lock() {
+                set.insert(resolved);
+            }
+            return 1;
         }
-    } else {
-        false
-    };
-
-    if should_suppress {
-        return 1;
     }
+
     CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
 }
