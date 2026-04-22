@@ -11,7 +11,12 @@ struct CleanupRegexes {
     whitespace: Regex,
     sentence_end: Regex,
     standalone_i: Regex,
-    i_contraction: Regex,
+    /// Collapses adjacent punctuation separated by optional whitespace. Used
+    /// to fix artifacts like "hey comma period" → "Hey,." where two spoken
+    /// punctuation commands leave their marks glued together after
+    /// `space_before_punct` strips the whitespace between them. Terminal
+    /// punct (`.!?`) wins over clause punct (`,;:`); ties keep the first.
+    adjacent_punct: Regex,
     punctuation: Vec<(Regex, &'static str)>,
     /// Dedicated handler for "dash" → em dash conversion. Handled separately
     /// from `punctuation` because we need a closure to skip cases like
@@ -112,7 +117,7 @@ fn regexes() -> &'static CleanupRegexes {
             whitespace: Regex::new(r"\s{2,}").unwrap(),
             sentence_end: Regex::new(r"([.!?])(\s+)([a-z])").unwrap(),
             standalone_i: Regex::new(r"\bi\b").unwrap(),
-            i_contraction: Regex::new(r"\bI'([msdtv])").unwrap(),
+            adjacent_punct: Regex::new(r"([.!?,;:])\s*([.!?,;:])").unwrap(),
             punctuation: punctuation_map,
             // Match the literal word "dash", optionally preceded by "em" or
             // "en". Group 1 captures the prefix (or is empty); group 2 is
@@ -165,7 +170,12 @@ pub fn cleanup_text(text: &str, smart_formatting: bool) -> String {
     let result = fix_sentence_capitalization(&result);
 
     // Regex-based formatting (spoken punctuation, numbers, etc.)
-    smart_format(&result)
+    let result = smart_format(&result);
+
+    // Re-apply sentence capitalization. `smart_format` may have exposed a new
+    // sentence boundary by collapsing adjacent punctuation (e.g. ",." → "."
+    // reveals a lowercase word that was previously hidden mid-phrase).
+    fix_sentence_capitalization(&result)
 }
 
 /// After filler removal, re-capitalize the first letter of any sentence that
@@ -218,6 +228,12 @@ fn smart_format(text: &str) -> String {
 
     // Format common spoken patterns
     result = format_spoken_patterns(&result);
+
+    // Capitalize any standalone lowercase "i" — the English pronoun is
+    // always "I". This also normalizes contractions like "i'm" → "I'm"
+    // because `\b` matches between the letter and the apostrophe.
+    let re = regexes();
+    result = re.standalone_i.replace_all(&result, "I").to_string();
 
     result
 }
@@ -291,6 +307,31 @@ fn format_spoken_patterns(text: &str) -> String {
 
     // Clean up spaces before punctuation
     result = re.space_before_punct.replace_all(&result, "$1").to_string();
+
+    // Collapse adjacent punctuation. Dictating two punctuation commands in a
+    // row ("hey comma period") or segment stitching can leave artifacts like
+    // ",." or ". ,". Rule: terminal (.!?) beats clause (,;:); within the same
+    // class, keep the first. Loop until stable so cascades like ",.," fully
+    // collapse.
+    loop {
+        let next = re
+            .adjacent_punct
+            .replace_all(&result, |caps: &regex::Captures| {
+                let a = &caps[1];
+                let b = &caps[2];
+                let is_terminal = |s: &str| matches!(s, "." | "?" | "!");
+                match (is_terminal(a), is_terminal(b)) {
+                    (true, false) => a.to_string(),
+                    (false, true) => b.to_string(),
+                    _ => a.to_string(),
+                }
+            })
+            .to_string();
+        if next == result {
+            break;
+        }
+        result = next;
+    }
 
     // Ensure space after punctuation
     result = re.no_space_after.replace_all(&result, "$1 $2").to_string();
@@ -547,7 +588,7 @@ fn is_safe_to_lowercase(word: &str) -> bool {
         // articles + 2-letter prepositions/conjunctions
         "a" | "an" | "the" | "of" | "to" | "in" | "on" | "at" | "by" |
         "as" | "if" | "or" | "so" | "is" | "am" | "be" | "do" | "we" |
-        "us" | "it" | "he" | "i" |
+        "us" | "it" | "he" |
         // 3-letter common words
         "and" | "but" | "for" | "nor" | "yet" | "are" | "was" | "had" |
         "has" | "did" | "let" | "all" | "any" | "may" | "can" | "see" |
@@ -677,6 +718,102 @@ mod tests {
     fn test_full_cleanup() {
         let result = cleanup_text("send an email to bob at test dot com", true);
         assert!(result.contains("bob@test.com"));
+    }
+
+    // ── standalone "i" capitalization ──────────────────────────────────
+
+    #[test]
+    fn test_standalone_i_capitalized() {
+        // A stray lowercase "i" gets uppercased to the pronoun "I".
+        let result = cleanup_text("i think i should ask", true);
+        assert_eq!(result, "I think I should ask");
+    }
+
+    #[test]
+    fn test_standalone_i_contraction_capitalized() {
+        // `\bi\b` matches the `i` before the apostrophe (apostrophe is a
+        // non-word char), so "i'm" becomes "I'm".
+        let result = cleanup_text("i'm going", true);
+        assert_eq!(result, "I'm going");
+    }
+
+    #[test]
+    fn test_standalone_i_preserves_embedded_i() {
+        // Words containing "i" (not standalone) must NOT be affected.
+        let result = cleanup_text("the iphone is in my bag", true);
+        // "i" inside "iphone"/"is"/"in"/"bag"/"my" stays. Only word-standalone
+        // "i" would be uppercased; there are none in this input.
+        assert!(result.contains("iphone"));
+        assert!(result.contains("is"));
+        assert!(result.contains("in"));
+    }
+
+    // ── adjacent punctuation collapse ──────────────────────────────────
+
+    #[test]
+    fn test_spoken_period_then_comma_collapses() {
+        // Dictating "period comma" back-to-back used to produce "Hey,."; now
+        // the terminal period wins and the following word is capitalized.
+        let result = cleanup_text("hey period comma world", true);
+        assert_eq!(result, "Hey. World");
+    }
+
+    #[test]
+    fn test_spoken_comma_then_period_collapses() {
+        // Reverse order — the terminal period still wins.
+        let result = cleanup_text("hey comma period world", true);
+        assert_eq!(result, "Hey. World");
+    }
+
+    #[test]
+    fn test_adjacent_punct_period_comma_literal() {
+        // Direct ".," in the text (e.g. from upstream) collapses to "." and
+        // the next word is re-capitalized.
+        let result = cleanup_text("hello.,world", true);
+        assert_eq!(result, "Hello. World");
+    }
+
+    #[test]
+    fn test_adjacent_punct_preserves_decimal() {
+        // "3.14" is a digit-period-digit sequence. The adjacent-punct regex
+        // must not touch it because the neighbors aren't punctuation.
+        let result = cleanup_text("it costs 3.14 dollars", true);
+        assert_eq!(result, "It costs 3.14 dollars");
+    }
+
+    #[test]
+    fn test_adjacent_punct_with_space_between() {
+        // A period followed by whitespace then a comma still collapses.
+        let result = smart_format("hello . , world");
+        // `space_before_punct` collapses leading whitespace, then
+        // `adjacent_punct` keeps the terminal period.
+        assert_eq!(result, "hello. world");
+    }
+
+    #[test]
+    fn test_adjacent_punct_double_comma() {
+        // Two commas in a row collapse to one (first wins).
+        let result = smart_format("foo ,, bar");
+        assert_eq!(result, "foo, bar");
+    }
+
+    // ── merge must not lowercase "I" ───────────────────────────────────
+
+    #[test]
+    fn test_merge_preserves_capital_i() {
+        // Previously, `is_safe_to_lowercase` included "i", so merging a
+        // stub-end prev segment with a next segment starting with "I" would
+        // produce "...to i think...". Must stay capitalized now.
+        let s = segs(&["I went to.", "I think we should."]);
+        let result = join_cleaned_segments(&s);
+        assert!(
+            !result.contains(" i think"),
+            "expected capital I after merge, got: {result}"
+        );
+        assert!(
+            result.contains("I think"),
+            "expected 'I think' preserved, got: {result}"
+        );
     }
 
     fn vocab(entries: &[(&str, &[&str])]) -> Vec<VocabEntry> {
