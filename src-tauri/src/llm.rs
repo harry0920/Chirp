@@ -194,8 +194,8 @@ fn undatamark(text: &str) -> String {
 // (a) hidden reasoning would slow cleanup latency and (b) it would make
 // output-length/prompt-injection guards unreliable.
 const MODEL_FILENAME: &str = "Qwen3-1.7B-Q4_K_M.gguf";
-const MODEL_URL: &str = "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf";
-const MODEL_SIZE: u64 = 1_100_000_000;
+const MODEL_URL: &str = "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf";
+const MODEL_SIZE: u64 = 1_110_000_000;
 
 /// llama-server release info. b8653 is needed for --reasoning-budget support
 /// (Qwen 3 thinking disable) — b8429 shipped with v1.2.5 predates it.
