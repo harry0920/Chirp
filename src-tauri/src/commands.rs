@@ -420,10 +420,6 @@ pub async fn start_recording(
     let smart_fmt_for_vad = s.settings.smart_formatting;
     let vocab_for_vad = s.vocabulary.clone();
     let snips_for_vad = s.snippets.clone();
-    let ai_cleanup_for_vad = s.settings.ai_cleanup;
-    let llm_port_for_vad = s.llm_port;
-    let tone_mode_for_vad = s.settings.tone_mode.clone();
-    let http_client_for_vad = s.http_client.clone();
     s.recording_state = RecordingState::Recording;
     s.vad_was_active = false;
     drop(s);
@@ -484,28 +480,11 @@ pub async fn start_recording(
                             let after_vocab = cleanup::apply_replacements(&after_regex, &vocab_for_vad);
                             let after_snips = snippets::apply_snippets(&after_vocab, &snips_for_vad);
 
-                            let final_text = if ai_cleanup_for_vad && llm_port_for_vad.is_some() {
-                                let port = llm_port_for_vad.unwrap();
-                                let tone = tone_mode_for_vad.clone();
-                                let client = http_client_for_vad.clone();
-                                let text = after_snips.clone();
-                                match tauri::async_runtime::block_on(async move {
-                                    llm::cleanup_text(port, &text, &tone, &client).await
-                                }) {
-                                    Ok(c) => {
-                                        log::info!("VAD segment {seg_idx} cleaned: '{c}'");
-                                        c
-                                    }
-                                    Err(e) => {
-                                        log::warn!("VAD segment {seg_idx} cleanup failed: {e}");
-                                        after_snips
-                                    }
-                                }
-                            } else {
-                                after_snips
-                            };
+                            // No per-segment LLM cleanup — the joined text
+                            // gets a single polish pass in stop_recording
+                            // after the hotkey is released.
                             cleaned.lock().unwrap_or_else(|e| e.into_inner())
-                                .push(final_text);
+                                .push(after_snips);
                             seg_idx += 1;
                         }
                         log::info!("VAD receiver thread exiting after {seg_idx} segments");
@@ -798,7 +777,9 @@ pub async fn stop_recording(
             vad_cleaned_texts.len(),
             joined.len()
         );
-        (Some(joined), ai_cleanup && llm_port.is_some())
+        // VAD segments are pre-cleaned (regex/vocab/snippets) but LLM cleanup
+        // is deferred to the single post-release pass below.
+        (Some(joined), false)
     } else {
         (None, false)
     };
