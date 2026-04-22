@@ -28,12 +28,12 @@ export const STT_MODELS = [
 ]
 
 export const LLM_MODEL = {
-  name: 'Qwen 2.5 3B Instruct',
+  name: 'Qwen 3 1.7B',
   displayName: 'Smart Cleanup',
-  size: '2.1 GB',
-  friendlySize: 'About 2.1 GB',
+  size: '1.1 GB',
+  friendlySize: 'About 1.1 GB',
   description: 'On-device language model that removes filler words, fixes stutters, and resolves self-corrections — all without sending audio anywhere.',
-  attribution: 'Built on Qwen 2.5 3B Instruct — Alibaba (Apache 2.0)',
+  attribution: 'Built on Qwen 3 1.7B — Alibaba (Apache 2.0)',
 }
 
 export const CLEANUP_EXAMPLE = {

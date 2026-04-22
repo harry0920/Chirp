@@ -7,6 +7,22 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [1.3.0] — Unreleased
 
+### 2026-04-21 — Hotkey rewrite, stuck-key fix, Qwen 3 1.7B cleanup LLM, non-English preservation
+
+#### Changed (additional)
+- **Cleanup LLM upgraded to Qwen 3 1.7B Q4_K_M (~1.1 GB).** Replaces
+  the Qwen 2.5 3B interim revert. Internal benchmarks show comparable
+  cleanup quality at roughly half the disk footprint and ~2× inference
+  speed. Thinking mode is disabled at the llama-server level via
+  `--reasoning-budget 0` so the model cannot emit `<think>` tokens —
+  hidden reasoning would break the latency budget and the
+  output-length / prompt-injection guard. `--jinja` is passed so the
+  GGUF's embedded chat template is used (required for Qwen 3; the
+  default llama-server template causes mode-collapse on instruct
+  tasks). `llama-server` bumped to b8653 (b8429 predates
+  `--reasoning-budget`), with a version marker so stale binaries from
+  v1.2.5 get replaced on first launch.
+
 ### 2026-04-21 — Hotkey rewrite, stuck-key fix, cleanup-LLM revert to Qwen 2.5, non-English preservation
 
 #### Fixed (additional)

@@ -187,12 +187,19 @@ fn undatamark(text: &str) -> String {
         .join(" ")
 }
 
-const MODEL_FILENAME: &str = "qwen2.5-3b-instruct-q4_k_m.gguf";
-const MODEL_URL: &str = "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf";
-const MODEL_SIZE: u64 = 2_100_000_000;
+// Qwen 3 1.7B Instruct (Alibaba, Apache 2.0). Half the disk of Qwen 2.5 3B
+// (~1.1 GB vs 2.1 GB) and roughly 2× inference speed on the same hardware.
+// Thinking mode is disabled at the server level via --reasoning-budget 0 so
+// the model cannot emit <think> tokens — critical for this use case because
+// (a) hidden reasoning would slow cleanup latency and (b) it would make
+// output-length/prompt-injection guards unreliable.
+const MODEL_FILENAME: &str = "Qwen3-1.7B-Q4_K_M.gguf";
+const MODEL_URL: &str = "https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf";
+const MODEL_SIZE: u64 = 1_100_000_000;
 
-/// llama-server release info
-const LLAMA_CPP_VERSION: &str = "b8429";
+/// llama-server release info. b8653 is needed for --reasoning-budget support
+/// (Qwen 3 thinking disable) — b8429 shipped with v1.2.5 predates it.
+const LLAMA_CPP_VERSION: &str = "b8653";
 
 fn llama_server_url() -> String {
     let (platform_suffix, ext) = if cfg!(target_os = "windows") {
@@ -207,7 +214,7 @@ fn llama_server_url() -> String {
         ("bin-ubuntu-x64", "tar.gz")
     };
     format!(
-        "https://github.com/ggerganov/llama.cpp/releases/download/{}/llama-{}-{}.{ext}",
+        "https://github.com/ggml-org/llama.cpp/releases/download/{}/llama-{}-{}.{ext}",
         LLAMA_CPP_VERSION, LLAMA_CPP_VERSION, platform_suffix
     )
 }
@@ -229,9 +236,22 @@ fn model_path() -> PathBuf {
     llm_dir().join(MODEL_FILENAME)
 }
 
-/// Check if llama-server binary exists
+fn version_marker_path() -> PathBuf {
+    llm_dir().join("llama-server.version")
+}
+
+/// Check if llama-server binary exists AND matches the expected version.
+/// The version marker lets us detect a stale llama-server left over from an
+/// older Chirp release (e.g. b8429 from v1.2.5) that lacks flags the current
+/// build needs (e.g. --reasoning-budget for Qwen 3 thinking disable).
 pub fn binary_exists() -> bool {
-    binary_path().exists()
+    if !binary_path().exists() {
+        return false;
+    }
+    match std::fs::read_to_string(version_marker_path()) {
+        Ok(v) if v.trim() == LLAMA_CPP_VERSION => true,
+        _ => false,
+    }
 }
 
 /// Check if the model GGUF exists
@@ -246,9 +266,28 @@ pub async fn download_binary(app_handle: &AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| format!("Failed to create LLM dir: {e}"))?;
 
+    // Skip download if binary exists AND matches the expected version.
+    if binary_exists() {
+        return Ok(());
+    }
+
+    // Clean up a stale llama-server (and its sibling DLLs/dylibs) from a
+    // previous Chirp release before downloading the new version.
     let dest = binary_path();
     if dest.exists() {
-        return Ok(());
+        log::info!("Replacing stale llama-server (upgrading to {})", LLAMA_CPP_VERSION);
+        if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.ends_with(".dll") || name_str.ends_with(".dylib")
+                    || name_str.ends_with(".so") || name_str.contains("llama-server")
+                {
+                    let _ = tokio::fs::remove_file(entry.path()).await;
+                }
+            }
+        }
+        let _ = tokio::fs::remove_file(version_marker_path()).await;
     }
 
     let url = llama_server_url();
@@ -309,6 +348,10 @@ pub async fn download_binary(app_handle: &AppHandle) -> Result<(), String> {
     if let Err(e) = tokio::fs::remove_file(&archive_path).await {
         log::warn!("Failed to clean up LLM archive: {e}");
     }
+
+    // Write version marker so the next launch knows this binary matches.
+    let _ = tokio::fs::write(version_marker_path(), LLAMA_CPP_VERSION).await;
+    log::info!("llama-server {} downloaded and extracted", LLAMA_CPP_VERSION);
 
     let _ = app_handle.emit("llm-download-progress", 100u32);
     Ok(())
@@ -415,6 +458,14 @@ pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
         .arg("512")
         .arg("--parallel")
         .arg("1")
+        // Qwen 3 thinking mode: zero the reasoning token budget so the model
+        // never emits <think> ... </think>. Hidden reasoning would blow the
+        // latency budget and break the output-length/prompt-injection guard.
+        .arg("--reasoning-budget").arg("0")
+        // Use the GGUF's embedded Jinja chat template. Qwen 3 requires this;
+        // the default llama-server template doesn't match its training format
+        // and causes mode-collapse on instruct tasks.
+        .arg("--jinja")
         .arg("--log-disable")
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
@@ -470,7 +521,7 @@ pub async fn cleanup_text(port: u16, text: &str, tone_mode: &str, client: &reqwe
     let marked_text = datamark(text);
 
     let payload = serde_json::json!({
-        "model": "qwen",
+        "model": "qwen3",
         "messages": [
             {"role": "system", "content": prompt},
             {"role": "user", "content": format!(
