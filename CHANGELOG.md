@@ -7,7 +7,19 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [1.3.0] — Unreleased
 
-### 2026-04-21 — Hotkey rewrite, stuck-key fix, cleanup-LLM revert to Qwen 2.5
+### 2026-04-21 — Hotkey rewrite, stuck-key fix, cleanup-LLM revert to Qwen 2.5, non-English preservation
+
+#### Fixed (additional)
+- **Non-English input was being translated to English.** Parakeet v3
+  transcribes Dutch/French/etc. correctly (the model is multilingual
+  across 25 European languages), but the cleanup LLM was "helpfully"
+  translating the output to match its English system prompt. Added
+  an explicit LANGUAGE rule to both cleanup prompts instructing Qwen
+  to output in the exact same language as the input and never
+  translate.
+
+---
+
 
 #### Added
 - **Global hotkey rewrite (Windows):** split into two mechanisms —
