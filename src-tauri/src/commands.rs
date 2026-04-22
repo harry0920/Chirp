@@ -416,12 +416,113 @@ pub async fn start_recording(
     *recording_start.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
 
     let device_id = s.settings.input_device.clone();
+    let recognizer_for_vad = s.recognizer.clone();
+    let smart_fmt_for_vad = s.settings.smart_formatting;
+    let vocab_for_vad = s.vocabulary.clone();
+    let snips_for_vad = s.snippets.clone();
+    let ai_cleanup_for_vad = s.settings.ai_cleanup;
+    let llm_port_for_vad = s.llm_port;
+    let tone_mode_for_vad = s.settings.tone_mode.clone();
+    let http_client_for_vad = s.http_client.clone();
     s.recording_state = RecordingState::Recording;
     s.vad_was_active = false;
     drop(s);
 
-    // Capture entire recording to buffer; transcribed in one shot on stop_recording.
-    let vad_arc: Option<Arc<std::sync::Mutex<crate::audio::VadState>>> = None;
+    // Set up VAD streaming if the model is available. Segments are transcribed
+    // and AI-cleaned as they arrive so stop_recording has no LLM latency.
+    let vad_model = settings::vad_model_path();
+    let vad_arc: Option<Arc<std::sync::Mutex<crate::audio::VadState>>> = if vad_model.exists() {
+        let (tx, rx) = crossbeam_channel::unbounded::<Vec<f32>>();
+        *vad_sender.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(tx.clone());
+
+        match audio::create_vad_state(&vad_model.to_string_lossy(), tx) {
+            Some(vs) => {
+                let vad_arc = Arc::new(std::sync::Mutex::new(vs));
+                *vad_flush_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(vad_arc.clone());
+
+                let transcripts = vad_transcripts.inner().clone();
+                let cleaned = vad_cleaned.0.clone();
+                let state_for_thread = state.inner().clone();
+                let rec = recognizer_for_vad.clone().unwrap();
+
+                let handle = std::thread::Builder::new()
+                    .name("vad-receiver".into())
+                    .spawn(move || {
+                        let mut seg_idx = 0u32;
+                        while let Ok(segment_audio) = rx.recv() {
+                            if segment_audio.is_empty() { break; } // poison pill
+                            let dur = segment_audio.len() as f32 / 16000.0;
+                            log::info!("VAD segment {seg_idx}: {:.1}s ({} samples)",
+                                dur, segment_audio.len());
+
+                            // Mark VAD as active so stop_recording uses streamed output.
+                            let s_handle = state_for_thread.clone();
+                            tauri::async_runtime::block_on(async move {
+                                let mut s = s_handle.lock().await;
+                                s.vad_was_active = true;
+                            });
+
+                            let raw = match transcribe::transcribe(&rec, &segment_audio) {
+                                Ok(t) => t,
+                                Err(e) => {
+                                    log::error!("VAD segment {seg_idx} transcription failed: {e}");
+                                    seg_idx += 1;
+                                    continue;
+                                }
+                            };
+                            if raw.is_empty() {
+                                seg_idx += 1;
+                                continue;
+                            }
+                            log::info!("VAD segment {seg_idx} transcript: '{raw}'");
+                            transcripts.lock().unwrap_or_else(|e| e.into_inner())
+                                .push(raw.clone());
+
+                            // Regex/vocab/snippet pre-pass — same as the
+                            // fallback path does in stop_recording.
+                            let after_regex = cleanup::cleanup_text(&raw, smart_fmt_for_vad);
+                            let after_vocab = cleanup::apply_replacements(&after_regex, &vocab_for_vad);
+                            let after_snips = snippets::apply_snippets(&after_vocab, &snips_for_vad);
+
+                            let final_text = if ai_cleanup_for_vad && llm_port_for_vad.is_some() {
+                                let port = llm_port_for_vad.unwrap();
+                                let tone = tone_mode_for_vad.clone();
+                                let client = http_client_for_vad.clone();
+                                let text = after_snips.clone();
+                                match tauri::async_runtime::block_on(async move {
+                                    llm::cleanup_text(port, &text, &tone, &client).await
+                                }) {
+                                    Ok(c) => {
+                                        log::info!("VAD segment {seg_idx} cleaned: '{c}'");
+                                        c
+                                    }
+                                    Err(e) => {
+                                        log::warn!("VAD segment {seg_idx} cleanup failed: {e}");
+                                        after_snips
+                                    }
+                                }
+                            } else {
+                                after_snips
+                            };
+                            cleaned.lock().unwrap_or_else(|e| e.into_inner())
+                                .push(final_text);
+                            seg_idx += 1;
+                        }
+                        log::info!("VAD receiver thread exiting after {seg_idx} segments");
+                    })
+                    .ok();
+                *vad_receiver_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = handle;
+                Some(vad_arc)
+            }
+            None => {
+                log::warn!("VAD state creation failed, using non-streaming transcription");
+                None
+            }
+        }
+    } else {
+        log::info!("VAD model not found, using non-streaming transcription");
+        None
+    };
 
     // Start audio capture — convert Result to Option immediately so the
     // non-Send cpal::Stream doesn't live across an await point.
