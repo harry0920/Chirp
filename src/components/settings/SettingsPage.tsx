@@ -14,35 +14,6 @@ import { Toggle } from '../shared/Toggle'
 import { Select } from '../shared/Select'
 import { KeyBadge } from '../shared/KeyBadge'
 import { Button } from '../shared/Button'
-import { Checkbox } from '../shared/Checkbox'
-
-const PRO_FEATURE_OPTIONS = [
-  {
-    id: 'fast-cloud',
-    label: 'Faster cloud transcription',
-    description: 'Optional low-latency mode for long dictations and lighter hardware',
-  },
-  {
-    id: 'mobile',
-    label: 'Mobile app',
-    description: 'Dictate and sync your words across desktop and phone',
-  },
-  {
-    id: 'meeting-notes',
-    label: 'Meeting notes',
-    description: 'Private transcripts, summaries, action items, and follow-ups',
-  },
-  {
-    id: 'rewriter',
-    label: 'Selected text rewriting',
-    description: 'Highlight text anywhere, speak an edit, and replace it',
-  },
-  {
-    id: 'sync',
-    label: 'Synced vocabulary and snippets',
-    description: 'Keep personal words, names, and shortcuts consistent everywhere',
-  },
-]
 
 const HOTKEY_MODE_OPTIONS: Array<{ id: HotkeyMode; label: string }> = [
   { id: 'hold', label: 'Hold' },
@@ -144,116 +115,6 @@ function FeedbackSection() {
             {status === 'sending' ? 'Sending...' : status === 'sent' ? 'Sent!' : 'Send'}
           </Button>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function ChirpProSection() {
-  const [email, setEmail] = useState('')
-  const [selected, setSelected] = useState<string[]>(['fast-cloud', 'mobile', 'meeting-notes'])
-  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
-  const [errorMsg, setErrorMsg] = useState('')
-
-  const emailTrimmed = email.trim()
-  const invalidEmail = emailTrimmed.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)
-
-  const toggleFeature = (id: string) => {
-    setSelected((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id]
-    )
-    if (status !== 'idle') setStatus('idle')
-  }
-
-  const handleSubmit = async () => {
-    if (invalidEmail) return
-    setStatus('sending')
-    setErrorMsg('')
-
-    const featureVotes = PRO_FEATURE_OPTIONS
-      .filter((option) => selected.includes(option.id))
-      .map((option) => option.label)
-
-    const payload = [
-      '[Chirp Pro interest]',
-      `Email: ${emailTrimmed || 'not provided'}`,
-      `Feature votes: ${featureVotes.length > 0 ? featureVotes.join(', ') : 'none selected'}`,
-      'Positioning: local-first should remain the default; Pro is for optional speed, sync, meetings, and mobile.',
-      'Source: Settings > Chirp Pro',
-    ].join('\n')
-
-    try {
-      await invoke('send_feedback', { text: payload })
-      setStatus('sent')
-      setEmail('')
-    } catch (e) {
-      setStatus('error')
-      setErrorMsg(String(e))
-    }
-  }
-
-  return (
-    <div className="w-full">
-      <div className="flex items-start justify-between gap-6">
-        <div className="max-w-[520px]">
-          <div className="text-[13px] font-medium text-dm-primary">Join the Chirp Pro waitlist</div>
-          <div className="mt-1 text-[12px] leading-relaxed text-dm-secondary">
-            Chirp stays local-first. Pro is an optional layer for speed, sync,
-            meeting notes, and mobile workflows that need more than one device.
-          </div>
-        </div>
-        <div className="rounded-full border border-chirp-amber-400/25 bg-chirp-amber-400/10 px-3 py-1 text-[11px] font-medium text-chirp-amber-600 whitespace-nowrap">
-          Optional cloud
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        {PRO_FEATURE_OPTIONS.map((option) => (
-          <Checkbox
-            key={option.id}
-            checked={selected.includes(option.id)}
-            onChange={() => toggleFeature(option.id)}
-            label={option.label}
-            description={option.description}
-          />
-        ))}
-      </div>
-
-      <div className="mt-4 flex items-start gap-2">
-        <div className="flex-1">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value)
-              if (status !== 'idle') setStatus('idle')
-            }}
-            placeholder="Email for early access, optional"
-            className="h-[36px] w-full rounded-[10px] border border-card-border bg-dm-input px-3 font-body text-[13px] text-dm-primary placeholder:text-dm-secondary focus:border-chirp-yellow focus:shadow-[0_0_0_3px_rgba(240,183,35,0.1)] focus:outline-none transition-all duration-150"
-          />
-          <div className="mt-1 min-h-[16px] text-[11px] text-dm-secondary">
-            {invalidEmail
-              ? 'Enter a valid email or leave it blank to only vote.'
-              : status === 'sent'
-                ? 'Thanks. Your interest was sent.'
-                : status === 'error'
-                  ? errorMsg
-                  : 'No account required. Leave email blank to only vote on features.'}
-          </div>
-        </div>
-        <Button
-          onClick={handleSubmit}
-          disabled={status === 'sending' || invalidEmail}
-          className="h-[36px] whitespace-nowrap"
-        >
-          {status === 'sending'
-            ? 'Sending...'
-            : emailTrimmed
-              ? 'Join waitlist'
-              : 'Send interest'}
-        </Button>
       </div>
     </div>
   )
@@ -938,16 +799,6 @@ export function SettingsPage() {
                 </Button>
               )}
             </div>
-          </Row>
-        </Card>
-      </div>
-
-      {/* Chirp Pro */}
-      <div className="animate-slide-up stagger-6">
-        <SectionLabel>Chirp Pro</SectionLabel>
-        <Card>
-          <Row last>
-            <ChirpProSection />
           </Row>
         </Card>
       </div>
