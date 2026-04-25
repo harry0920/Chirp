@@ -232,10 +232,21 @@ fn snippets_path() -> PathBuf {
 pub fn load_snippets() -> Vec<SnippetEntry> {
     let path = snippets_path();
     match std::fs::read_to_string(&path) {
-        Ok(data) => serde_json::from_str(&data).unwrap_or_else(|e| {
-            log::warn!("Corrupted snippets JSON, resetting: {e}");
-            default_snippets()
-        }),
+        Ok(data) => match serde_json::from_str::<Vec<SnippetEntry>>(&data) {
+            Ok(entries) => {
+                if entries == legacy_default_snippets() {
+                    log::info!("Removed legacy placeholder snippets");
+                    let _ = save_snippets(&[]);
+                    Vec::new()
+                } else {
+                    entries
+                }
+            }
+            Err(e) => {
+                log::warn!("Corrupted snippets JSON, resetting: {e}");
+                Vec::new()
+            }
+        },
         Err(_) => default_snippets(),
     }
 }
@@ -251,6 +262,10 @@ pub fn save_snippets(entries: &[SnippetEntry]) -> Result<(), String> {
 }
 
 fn default_snippets() -> Vec<SnippetEntry> {
+    Vec::new()
+}
+
+fn legacy_default_snippets() -> Vec<SnippetEntry> {
     vec![
         SnippetEntry {
             trigger: "my email address".into(),

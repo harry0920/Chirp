@@ -246,6 +246,7 @@ unsafe fn handle_raw_input(hri: HRAWINPUT) {
 
         if is_release {
             state.held.remove(&id);
+            reconcile_held_combo_keys(state);
             if state.combo_active && state.combo.contains(&id) {
                 state.combo_active = false;
                 state.active_combo.store(false);
@@ -254,6 +255,7 @@ unsafe fn handle_raw_input(hri: HRAWINPUT) {
             }
         } else {
             state.held.insert(id.clone());
+            reconcile_held_combo_keys(state);
             if state.held == state.combo && !state.combo_active {
                 state.combo_active = true;
                 state.active_combo.store(true);
@@ -263,6 +265,25 @@ unsafe fn handle_raw_input(hri: HRAWINPUT) {
             let _ = state.modifier_only;
         }
     });
+}
+
+fn reconcile_held_combo_keys(state: &mut ThreadState) {
+    let stale_keys: Vec<String> = state
+        .combo
+        .iter()
+        .filter_map(|key| {
+            let vk = id_to_vk(key)?;
+            (!is_key_physically_down(vk)).then(|| key.clone())
+        })
+        .collect();
+
+    for key in stale_keys {
+        state.held.remove(&key);
+    }
+}
+
+fn is_key_physically_down(vk: u16) -> bool {
+    unsafe { (GetAsyncKeyState(vk as i32) as u16 & 0x8000) != 0 }
 }
 
 /// Disambiguate generic VK_SHIFT / VK_CONTROL / VK_MENU into left/right

@@ -1,5 +1,6 @@
 export const DEFAULT_SETTINGS = {
   hotkey: 'MetaLeft+ShiftLeft+Space',
+  hotkeyMode: 'hold' as const,
   launchAtLogin: true,
   playSoundOnComplete: false,
   autoDismissOverlay: true,

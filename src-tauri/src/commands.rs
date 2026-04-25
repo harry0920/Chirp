@@ -176,6 +176,10 @@ pub async fn update_settings(
         let _ = app_handle.emit("history-changed", ());
     }
 
+    if partial.get("hotkeyMode").is_some() {
+        log::info!("Hotkey mode updated: {:?}", s.settings.hotkey_mode);
+    }
+
     // Sync autostart
     let autostart = app_handle.autolaunch();
     if s.settings.launch_at_login {
@@ -749,10 +753,8 @@ pub async fn stop_recording(
         !vad_was_active
     );
 
-    // The streaming path bypasses the monolithic regex+LLM block. We only
-    // compute `streaming_result` up-front in that case, and set
-    // `streaming_was_cleaned_up` so history accounting reflects whether the
-    // LLM actually ran (which it did, per-segment, if ai_cleanup was enabled).
+    // The streaming path bypasses the blocking ASR fallback. It still runs the
+    // same single LLM cleanup pass after the hotkey is released.
     let (formatted_opt, streaming_was_cleaned_up) = if use_vad {
         if vad_cleaned_texts.is_empty() {
             log::warn!("VAD cleaned transcripts empty — returning empty result (no fallback)");
@@ -763,8 +765,8 @@ pub async fn stop_recording(
         // Smart join: strip mid-sentence orphan periods, merge stub-end
         // segments with their continuation, drop internal paragraph breaks,
         // and re-run the regex pre-pass on the joined output to catch
-        // cross-boundary fillers. See cleanup::join_cleaned_segments.
-        let joined = cleanup::join_cleaned_segments(&vad_cleaned_texts);
+        // cross-boundary fillers. See cleanup::join_cleaned_segments_with_formatting.
+        let joined = cleanup::join_cleaned_segments_with_formatting(&vad_cleaned_texts, smart_fmt);
         if joined.trim().is_empty() {
             log::warn!("VAD cleaned transcripts all whitespace after join — returning empty result");
             let mut s = state.lock().await;
@@ -844,9 +846,8 @@ pub async fn stop_recording(
         }
     };
 
-    // AI cleanup pass (if enabled and server is running). The streaming/VAD
-    // path already ran the LLM per-segment and reports via
-    // streaming_was_cleaned_up; this block only runs on the fallback path.
+    // AI cleanup pass (if enabled and server is running). Both VAD and
+    // fallback paths arrive here after deterministic regex/vocabulary cleanup.
     let mut was_cleaned_up = streaming_was_cleaned_up;
     let result = if !streaming_was_cleaned_up && ai_cleanup && llm_port.is_some() {
         let port = llm_port.unwrap();
@@ -1168,11 +1169,38 @@ pub async fn test_microphone(
 pub async fn get_llm_status(
     state: State<'_, SharedState>,
 ) -> Result<llm::LlmStatus, String> {
-    let s = state.lock().await;
+    let mut s = state.lock().await;
+    let mut server_running = s.llm_port.is_some();
+
+    let child_status = s.llm_process.as_mut().map(|child| child.try_wait());
+    match child_status {
+        Some(Ok(Some(status))) => {
+            log::warn!("llama-server exited unexpectedly: {status}");
+            s.llm_process = None;
+            s.llm_port = None;
+            llm::clear_server_pid();
+            server_running = false;
+        }
+        Some(Ok(None)) => {}
+        Some(Err(e)) => {
+            log::warn!("Failed to check llama-server status: {e}");
+            s.llm_process = None;
+            s.llm_port = None;
+            llm::clear_server_pid();
+            server_running = false;
+        }
+        None if s.llm_port.is_some() => {
+            s.llm_port = None;
+            llm::clear_server_pid();
+            server_running = false;
+        }
+        None => {}
+    }
+
     Ok(llm::LlmStatus {
         binary_downloaded: llm::binary_exists(),
         model_downloaded: llm::model_exists(),
-        server_running: s.llm_port.is_some(),
+        server_running,
     })
 }
 

@@ -57,9 +57,9 @@ export default {
         'dm-keybadge-text': 'var(--color-keybadge-text)',
       },
       fontFamily: {
-        display: ['Nunito', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        display: ['Aptos Display', 'Segoe UI', 'system-ui', 'sans-serif'],
+        body: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+        mono: ['Cascadia Mono', 'JetBrains Mono', 'Consolas', 'monospace'],
       },
       borderRadius: {
         card: '14px',

@@ -7,7 +7,7 @@ import { useTauri } from './useTauri'
 
 // Settings keys that should be synced to the backend
 const SYNCED_KEYS = [
-  'hotkey', 'launchAtLogin', 'playSoundOnComplete',
+  'hotkey', 'hotkeyMode', 'launchAtLogin', 'playSoundOnComplete',
   'autoDismissOverlay', 'smartFormatting',
   'inputDevice', 'model', 'onboardingComplete',
   'aiCleanup',
@@ -44,29 +44,29 @@ export function useSettingsSync() {
       }
       useAppStore.getState().setSettingsLoaded()
     }).catch((e) => {
-      console.error('Failed to load settings:', e)
+      if (import.meta.env.DEV) console.error('Failed to load settings:', e)
       useAppStore.getState().setSettingsLoaded()
     })
 
     // Load transcription history
     tauri.getHistory().then((entries) => {
       useAppStore.getState().setHistory(entries)
-    }).catch((e) => console.error('Failed to load history:', e))
+    }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to load history:', e) })
 
     // Load vocabulary (typed as VocabEntry[] from the backend)
     invoke('get_vocabulary').then((entries) => {
       useAppStore.getState().setVocabulary(entries as VocabEntry[])
-    }).catch((e) => console.error('Failed to load vocabulary:', e))
+    }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to load vocabulary:', e) })
 
     // Load snippets
     tauri.getSnippets().then((entries) => {
       useAppStore.getState().setSnippets(entries)
-    }).catch((e) => console.error('Failed to load snippets:', e))
+    }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to load snippets:', e) })
 
     // Load initial hotkey status
     tauri.getHotkeyStatus().then((status) => {
       useAppStore.getState().setHotkeyStatus(status as 'idle' | 'retrying' | 'active' | 'failed')
-    }).catch((e) => console.error('Failed to get hotkey status:', e))
+    }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to get hotkey status:', e) })
 
     // Check model download status
     for (const model of ['parakeet-tdt-0.6b']) {
@@ -79,7 +79,7 @@ export function useSettingsSync() {
             },
           })
         }
-      }).catch((e) => console.error('Failed to get model status:', e))
+      }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to get model status:', e) })
     }
 
     // Initialize LLM ready state from backend
@@ -87,7 +87,7 @@ export function useSettingsSync() {
       if (status.serverRunning) {
         useAppStore.getState().setLlmReady(true)
       }
-    }).catch((e) => console.error('Failed to get LLM status:', e))
+    }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to get LLM status:', e) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- one-time init
 
   // Always-active: sync store changes back to backend + listen for events.
@@ -109,7 +109,7 @@ export function useSettingsSync() {
     listen('history-changed', () => {
       tauri.getHistory().then((entries) => {
         useAppStore.getState().setHistory(entries)
-      }).catch((e) => console.error('Failed to reload history:', e))
+      }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to reload history:', e) })
     }).then((fn) => unlisteners.push(fn))
 
     // Listen for settings changes from other windows (cross-window sync)
@@ -138,21 +138,21 @@ export function useSettingsSync() {
       if (Object.keys(changed).length > 0) {
         invoke('update_settings', { partial: changed }).then(() => {
           useAppStore.getState().setSettingsSaved(true)
-        }).catch((e) => console.error('Failed to sync settings:', e))
+        }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to sync settings:', e) })
       }
 
       // Sync vocabulary changes
       if (state.vocabulary !== prevState.vocabulary) {
         invoke('update_vocabulary', { entries: state.vocabulary }).then(() => {
           useAppStore.getState().setSettingsSaved(true)
-        }).catch((e) => console.error('Failed to sync vocabulary:', e))
+        }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to sync vocabulary:', e) })
       }
 
       // Sync snippet changes
       if (state.snippets !== prevState.snippets) {
         invoke('update_snippets', { entries: state.snippets }).then(() => {
           useAppStore.getState().setSettingsSaved(true)
-        }).catch((e) => console.error('Failed to sync snippets:', e))
+        }).catch((e) => { if (import.meta.env.DEV) console.error('Failed to sync snippets:', e) })
       }
 
     })

@@ -27,7 +27,7 @@ export function useCleanupToggle() {
         await tauri.startLlm()
         store.setLlmReady(true)
       } catch (e) {
-        console.error('Failed to start LLM:', e)
+        if (import.meta.env.DEV) console.error('Failed to start LLM:', e)
       }
       setCleanupStarting(false)
     } else if (!enabled && store.llmReady) {
@@ -35,7 +35,7 @@ export function useCleanupToggle() {
         await tauri.stopLlm()
         store.setLlmReady(false)
       } catch (e) {
-        console.error('Failed to stop LLM:', e)
+        if (import.meta.env.DEV) console.error('Failed to stop LLM:', e)
       }
     }
   }

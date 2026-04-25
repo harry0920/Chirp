@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { trackEvent } from '@aptabase/tauri'
 import { Search, Download, Trash2, Copy, BookText, Zap, ChevronDown, Clock, Mic, Type, Hash, AlertTriangle, Check } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
@@ -149,11 +149,11 @@ export function HomePage() {
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [showExportSuccess, setShowExportSuccess] = useState(false)
 
-  const handleClearHistory = useCallback(async () => {
+  const handleClearHistory = async () => {
     setShowClearConfirm(false)
     await tauri.clearHistory()
     store.setHistory([])
-  }, [tauri, store])
+  }
 
   const updateAvailable = store.updateAvailable
   const setAboutModalOpen = useAppStore((s) => s.setAboutModalOpen)

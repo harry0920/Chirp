@@ -4,7 +4,7 @@ import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from '../stores/appStore'
 
 const SYNCED_KEYS = [
-  'hotkey', 'launchAtLogin', 'playSoundOnComplete',
+  'hotkey', 'hotkeyMode', 'launchAtLogin', 'playSoundOnComplete',
   'autoDismissOverlay', 'smartFormatting',
   'inputDevice', 'model', 'onboardingComplete',
   'aiCleanup', 'cleanupModel', 'beamSearch', 'toneMode',
@@ -60,7 +60,7 @@ export function useOverlaySync() {
             await new Promise((r) => setTimeout(r, 100))
             continue
           }
-          console.error('Failed to load settings:', e)
+          if (import.meta.env.DEV) console.error('Failed to load settings:', e)
           useAppStore.getState().setSettingsLoaded()
           return
         }
@@ -107,9 +107,9 @@ export function useOverlaySync() {
         }
       }
       if (Object.keys(changed).length > 0) {
-        invoke('update_settings', { partial: changed }).catch((e) =>
-          console.error('Failed to sync settings:', e)
-        )
+        invoke('update_settings', { partial: changed }).catch((e) => {
+          if (import.meta.env.DEV) console.error('Failed to sync settings:', e)
+        })
       }
     })
 

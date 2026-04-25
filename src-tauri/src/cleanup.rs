@@ -380,7 +380,15 @@ fn format_spoken_patterns(text: &str) -> String {
 ///     fillers and normalize whitespace.
 ///
 /// All deterministic, no LLM calls. Idempotent.
+#[cfg(test)]
 pub fn join_cleaned_segments(segments: &[String]) -> String {
+    join_cleaned_segments_with_formatting(segments, true)
+}
+
+pub fn join_cleaned_segments_with_formatting(
+    segments: &[String],
+    smart_formatting: bool,
+) -> String {
     // Step 1: strip internal paragraph breaks the model may have inserted
     // within a single segment, and trim whitespace.
     let cleaned: Vec<String> = segments
@@ -407,7 +415,7 @@ pub fn join_cleaned_segments(segments: &[String]) -> String {
     // idempotent for already-cleaned text but catches cross-boundary
     // patterns (a filler "um" that survived because it was at a segment
     // boundary) and normalizes whitespace.
-    cleanup_text(&merged, true)
+    cleanup_text(&merged, smart_formatting)
 }
 
 /// Split text into sentences. A sentence ends at `.`, `!`, or `?` followed
@@ -902,6 +910,15 @@ mod tests {
     fn test_join_single_segment_passthrough() {
         let s = segs(&["Hello world."]);
         assert_eq!(join_cleaned_segments(&s), "Hello world.");
+    }
+
+    #[test]
+    fn test_join_respects_smart_formatting_disabled() {
+        let s = segs(&["hello period."]);
+        assert_eq!(
+            join_cleaned_segments_with_formatting(&s, false),
+            "hello period."
+        );
     }
 
     #[test]

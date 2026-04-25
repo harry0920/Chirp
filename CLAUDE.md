@@ -119,5 +119,4 @@ Dark sidebar (`#1a1917`) with noise texture and amber glow. Warm off-white conte
 ## Spec Documents
 
 - `APP.md` — Complete feature spec, UI screens, user flows
-- `CHIRP-SPEC.md` — Tech stack and architecture overview
 - `docs/superpowers/specs/2026-03-21-ui-redesign-design.md` — UI redesign design spec

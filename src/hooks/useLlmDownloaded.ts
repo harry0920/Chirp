@@ -16,7 +16,9 @@ export function useLlmDownloaded() {
   useEffect(() => {
     tauri.getLlmStatus().then((status) => {
       setLlmDownloaded(status.binaryDownloaded && status.modelDownloaded)
-    }).catch((e) => console.error('Failed to get LLM status:', e))
+    }).catch((e) => {
+      if (import.meta.env.DEV) console.error('Failed to get LLM status:', e)
+    })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- one-time init
 
   return [llmDownloaded, setLlmDownloaded] as const
