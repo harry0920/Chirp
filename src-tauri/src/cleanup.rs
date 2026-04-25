@@ -135,7 +135,7 @@ fn regexes() -> &'static CleanupRegexes {
             hundred_pct: Regex::new(r"(?i)\b(one )?hundred percent\b").unwrap(),
             period_and: Regex::new(r"\.\s+And\b").unwrap(),
             boundary_then_than: Regex::new(r"(?i)\b(?P<then>and\s+then)\s+than\s+(?P<gerund>[a-z]+ing)\b").unwrap(),
-            boundary_safe_cap: Regex::new(r"\b(?P<prefix>(?:and|but|or|so|because|since|while|though|although|if|when|that|then|than|like|also|plus|different)\s+)(?P<word>[A-Z][a-z]+(?:'[a-z]+)?)\b").unwrap(),
+            boundary_safe_cap: Regex::new(r"\b(?P<prefix>[A-Za-z']+)(?P<gap>\s+)(?P<word>[A-Z][a-z]+(?:'[a-z]+)?)\b").unwrap(),
         }
     })
 }
@@ -461,9 +461,10 @@ pub fn repair_vad_boundary_artifacts(text: &str) -> String {
     result = re
         .boundary_safe_cap
         .replace_all(&result, |caps: &regex::Captures| {
+            let prefix = &caps["prefix"];
             let word = &caps["word"];
-            if is_safe_to_lowercase(&word.to_lowercase()) {
-                format!("{}{}", &caps["prefix"], lowercase_first_ascii(word))
+            if should_lowercase_boundary_cap(prefix, word) {
+                format!("{}{}{}", prefix, &caps["gap"], lowercase_first_ascii(word))
             } else {
                 caps[0].to_string()
             }
@@ -471,6 +472,45 @@ pub fn repair_vad_boundary_artifacts(text: &str) -> String {
         .to_string();
 
     result
+}
+
+/// Decide whether a Title Case word is probably capitalization introduced by
+/// a VAD/ASR boundary rather than a real proper noun. Parakeet already
+/// capitalizes proper nouns, so this stays deliberately conservative:
+/// only closed-class/common lowercase words are changed, and only when the
+/// previous word makes the phrase grammatically unfinished.
+fn should_lowercase_boundary_cap(prefix: &str, word: &str) -> bool {
+    if word == "I" || (word.chars().any(|c| c.is_uppercase()) && !is_title_case_word(word)) {
+        return false;
+    }
+
+    let prefix_lc = prefix.to_lowercase();
+    let word_lc = word.to_lowercase();
+
+    is_safe_to_lowercase(&word_lc)
+        && (is_boundary_lowercase_prefix(&prefix_lc) || is_continuation_start_word(&word_lc))
+}
+
+fn is_title_case_word(word: &str) -> bool {
+    let mut chars = word.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+
+    first.is_uppercase() && chars.all(|c| !c.is_uppercase())
+}
+
+fn is_boundary_lowercase_prefix(word: &str) -> bool {
+    is_stub_end_word(word)
+        || matches!(
+            word,
+            // Complementizers / subordinators that commonly introduce an
+            // unfinished clause in dictation.
+            "that" | "because" | "since" | "while" | "although" | "though" | "when" |
+            // Discourse connectors that often survive VAD joins without a
+            // real sentence boundary.
+            "like" | "also" | "plus" | "different"
+        )
 }
 
 /// Split text into sentences. A sentence ends at `.`, `!`, or `?` followed
@@ -1205,6 +1245,17 @@ mod tests {
     }
 
     #[test]
+    fn test_repair_boundary_uses_unfinished_grammar_pattern() {
+        let result = repair_vad_boundary_artifacts(
+            "This prompt is Also dictated with Chirp. Voice rules should have a It should be local.",
+        );
+        assert_eq!(
+            result,
+            "This prompt is also dictated with Chirp. Voice rules should have a it should be local."
+        );
+    }
+
+    #[test]
     fn test_repair_boundary_then_than_gerund() {
         let result = repair_vad_boundary_artifacts(
             "We should communicate that clearly in wireframing first, and then Than implementing a brand kit.",
@@ -1226,6 +1277,17 @@ mod tests {
     fn test_repair_boundary_preserves_title_case_names() {
         let result = repair_vad_boundary_artifacts("I read The Verge today.");
         assert_eq!(result, "I read The Verge today.");
+    }
+
+    #[test]
+    fn test_repair_boundary_preserves_parakeet_proper_nouns() {
+        let result = repair_vad_boundary_artifacts(
+            "I talked to Claude about SiteLift before sending it to Google.",
+        );
+        assert_eq!(
+            result,
+            "I talked to Claude about SiteLift before sending it to Google."
+        );
     }
 
     #[test]
