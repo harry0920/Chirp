@@ -16,6 +16,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 
 const CHIRP_SOUND: &[u8] = include_bytes!("../sounds/chirp.wav");
+const MIN_AI_CLEANUP_WORDS: usize = 7;
 
 /// Join VAD segments with boundary cleanup. When VAD splits mid-sentence,
 /// each segment starts with a capital letter and may end with a period that
@@ -913,7 +914,14 @@ pub async fn stop_recording(
     // AI cleanup pass (if enabled and server is running). Both VAD and
     // fallback paths arrive here after deterministic regex/vocabulary cleanup.
     let mut was_cleaned_up = streaming_was_cleaned_up;
-    let result = if !streaming_was_cleaned_up && ai_cleanup && llm_port.is_some() {
+    let formatted_word_count = formatted.split_whitespace().count();
+    let skip_ai_for_short_message =
+        tone_mode != "email" && formatted_word_count < MIN_AI_CLEANUP_WORDS;
+    let result = if !streaming_was_cleaned_up
+        && ai_cleanup
+        && llm_port.is_some()
+        && !skip_ai_for_short_message
+    {
         let port = llm_port.unwrap();
         let _ = app_handle.emit("recording-state", "polishing");
         log::info!("Running AI cleanup on text...");
@@ -929,6 +937,13 @@ pub async fn stop_recording(
             }
         }
     } else {
+        if !streaming_was_cleaned_up
+            && ai_cleanup
+            && llm_port.is_some()
+            && skip_ai_for_short_message
+        {
+            log::info!("Skipping AI cleanup for short message ({formatted_word_count} words)");
+        }
         formatted
     };
 

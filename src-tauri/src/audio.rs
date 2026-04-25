@@ -9,6 +9,11 @@ use tauri::{AppHandle, Emitter};
 
 use crate::state::{AmplitudeData, AudioBuffer, AudioDevice};
 
+const VAD_THRESHOLD: f32 = 0.6;
+const VAD_MIN_SILENCE_SECS: f32 = 0.7;
+const VAD_MAX_SPEECH_SECS: f32 = 20.0;
+const VAD_FORCE_SPLIT_SECS: usize = 20;
+
 /// Holds resampler state so callers can flush remaining samples on stop.
 pub struct ResamplerState {
     pub resampler: Option<Arc<std::sync::Mutex<FftFixedIn<f32>>>>,
@@ -67,11 +72,11 @@ pub fn create_vad_state(model_path: &str, segment_tx: Sender<Vec<f32>>) -> Optio
     let config = VadModelConfig {
         silero_vad: SileroVadModelConfig {
             model: Some(model_path.to_string()),
-            threshold: 0.5,
-            min_silence_duration: 1.0,
+            threshold: VAD_THRESHOLD,
+            min_silence_duration: VAD_MIN_SILENCE_SECS,
             min_speech_duration: 0.25,
             window_size: 512,
-            max_speech_duration: 30.0,
+            max_speech_duration: VAD_MAX_SPEECH_SECS,
         },
         sample_rate: 16000,
         num_threads: 1,
@@ -82,14 +87,16 @@ pub fn create_vad_state(model_path: &str, segment_tx: Sender<Vec<f32>>) -> Optio
 
     match VoiceActivityDetector::create(&config, 60.0) {
         Some(vad) => {
-            log::info!("Silero VAD initialized (threshold=0.5, min_silence=1.0s)");
+            log::info!(
+                "Silero VAD initialized (threshold={VAD_THRESHOLD}, min_silence={VAD_MIN_SILENCE_SECS}s, max_speech={VAD_MAX_SPEECH_SECS}s)"
+            );
             Some(VadState {
                 vad,
                 segment_tx,
                 vad_buf: Vec::new(),
                 window_size: 512,
                 samples_since_split: 0,
-                max_samples_before_split: 30 * 16000, // 30s
+                max_samples_before_split: VAD_FORCE_SPLIT_SECS * 16000,
             })
         }
         None => {
@@ -115,7 +122,8 @@ fn feed_vad(samples: &[f32], vad_state: &Arc<std::sync::Mutex<VadState>>) {
         let chunk: Vec<f32> = vs.vad_buf.drain(..win).collect();
         vs.vad.accept_waveform(&chunk);
 
-        // Force split at 30s continuous speech
+        // Force split during long continuous speech as a backstop for
+        // environments where VAD treats small thinking pauses as speech.
         if vs.samples_since_split >= vs.max_samples_before_split {
             vs.vad.flush();
             vs.samples_since_split = 0;

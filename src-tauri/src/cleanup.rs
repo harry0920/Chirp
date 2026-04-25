@@ -117,7 +117,7 @@ fn regexes() -> &'static CleanupRegexes {
             dangling_comma: Regex::new(r",\s*,").unwrap(),
             leading_comma: Regex::new(r"^\s*,\s*").unwrap(),
             whitespace: Regex::new(r"\s{2,}").unwrap(),
-            sentence_end: Regex::new(r"([.!?])(\s+)([a-z])").unwrap(),
+            sentence_end: Regex::new(r#"([.!?:])(["')\]]*)(\s+)(["'(\[]*)([a-z])"#).unwrap(),
             standalone_i: Regex::new(r"\bi\b").unwrap(),
             adjacent_punct: Regex::new(r"([.!?,;:])\s*([.!?,;:])").unwrap(),
             punctuation: punctuation_map,
@@ -190,9 +190,11 @@ fn fix_sentence_capitalization(text: &str) -> String {
     re.sentence_end
         .replace_all(text, |caps: &regex::Captures| {
             let punct = &caps[1];
-            let ws = &caps[2];
-            let letter = caps[3].to_uppercase();
-            format!("{punct}{ws}{letter}")
+            let closers = &caps[2];
+            let ws = &caps[3];
+            let prefix = &caps[4];
+            let letter = caps[5].to_uppercase();
+            format!("{punct}{closers}{ws}{prefix}{letter}")
         })
         .to_string()
 }
@@ -218,9 +220,18 @@ fn capitalize_first(text: &str) -> String {
     if trimmed.is_empty() {
         return String::new();
     }
-    let mut chars = trimmed.chars();
-    let first = chars.next().unwrap();
-    first.to_uppercase().to_string() + chars.as_str()
+
+    for (idx, ch) in trimmed.char_indices() {
+        if ch.is_alphabetic() {
+            let mut result = String::with_capacity(trimmed.len());
+            result.push_str(&trimmed[..idx]);
+            result.push_str(&ch.to_uppercase().to_string());
+            result.push_str(&trimmed[idx + ch.len_utf8()..]);
+            return result;
+        }
+    }
+
+    trimmed.to_string()
 }
 
 /// Smart formatting: punctuation, capitalization, numbers, common patterns
@@ -796,6 +807,33 @@ mod tests {
         // non-word char), so "i'm" becomes "I'm".
         let result = cleanup_text("i'm going", true);
         assert_eq!(result, "I'm going");
+    }
+
+    #[test]
+    fn test_standalone_i_common_contractions_capitalized() {
+        let result = cleanup_text("i'll go because i've got it and i'd like to", true);
+        assert_eq!(result, "I'll go because I've got it and I'd like to");
+    }
+
+    #[test]
+    fn test_capitalizes_after_quotes_and_parens() {
+        let result = cleanup_text("he said. \"this works.\" (this also works).", true);
+        assert_eq!(result, "He said. \"This works.\" (This also works).");
+    }
+
+    #[test]
+    fn test_capitalizes_after_colon_and_newline() {
+        let result = cleanup_text("note: this should start capitalized.\nnext line too.", true);
+        assert_eq!(
+            result,
+            "Note: This should start capitalized.\nNext line too."
+        );
+    }
+
+    #[test]
+    fn test_capitalizes_initial_quoted_text() {
+        let result = cleanup_text("\"hello there,\" he said.", true);
+        assert_eq!(result, "\"Hello there,\" he said.");
     }
 
     #[test]
