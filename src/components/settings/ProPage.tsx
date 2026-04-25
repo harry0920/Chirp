@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Check, Cloud, Gauge, ListChecks, NotebookTabs, Smartphone, Sparkles, WandSparkles } from 'lucide-react'
+import { Ban, Check, Cloud, Gauge, ListChecks, NotebookTabs, Smartphone, WandSparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Button } from '../shared/Button'
 
@@ -12,8 +12,8 @@ const PRO_FEATURE_OPTIONS: Array<{
 }> = [
   {
     id: 'fast-cloud',
-    label: 'Faster cloud transcription',
-    description: 'Optional low-latency mode for long dictations and lighter hardware.',
+    label: 'Sub-second mode',
+    description: 'A faster path for long dictations and lighter machines, with clear user control.',
     icon: Gauge,
   },
   {
@@ -40,6 +40,12 @@ const PRO_FEATURE_OPTIONS: Array<{
     description: 'Keep personal words, names, and shortcuts consistent everywhere.',
     icon: Cloud,
   },
+  {
+    id: 'no-pro',
+    label: 'No Pro, keep Chirp local only',
+    description: 'I do not want a Pro tier. Keep the product focused on local desktop dictation.',
+    icon: Ban,
+  },
 ]
 
 export function ProPage() {
@@ -52,11 +58,16 @@ export function ProPage() {
   const invalidEmail = emailTrimmed.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)
 
   const toggleFeature = (id: string) => {
-    setSelected((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id]
-    )
+    setSelected((current) => {
+      if (id === 'no-pro') {
+        return current.includes(id) ? [] : ['no-pro']
+      }
+
+      const withoutNoPro = current.filter((item) => item !== 'no-pro')
+      return withoutNoPro.includes(id)
+        ? withoutNoPro.filter((item) => item !== id)
+        : [...withoutNoPro, id]
+    })
     if (status !== 'idle') setStatus('idle')
   }
 
@@ -71,9 +82,11 @@ export function ProPage() {
 
     const payload = [
       '[Chirp Pro interest]',
+      `Sentiment: ${selected.includes('no-pro') ? 'against-pro' : 'interested'}`,
       `Email: ${emailTrimmed || 'not provided'}`,
+      `Feature IDs: ${selected.length > 0 ? selected.join(', ') : 'none selected'}`,
       `Feature votes: ${featureVotes.length > 0 ? featureVotes.join(', ') : 'none selected'}`,
-      'Positioning: local-first should remain the default; Pro is for optional speed, sync, meetings, and mobile.',
+      'Positioning: local-first desktop dictation remains the default. Pro is only being considered for workflows that need more than one device, faster compute, or structured meeting output.',
       'Source: Pro page',
     ].join('\n')
 
@@ -92,24 +105,22 @@ export function ProPage() {
       <section className="animate-slide-up rounded-card border border-card-border bg-card px-6 py-5">
         <div className="flex items-start justify-between gap-6">
           <div className="min-w-0">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-chirp-amber-400/30 bg-chirp-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.8px] text-chirp-amber-600">
-              <Sparkles size={13} strokeWidth={2} />
-              Optional cloud
-            </div>
             <h1 className="font-display text-[28px] font-black leading-tight text-dm-primary">
-              Chirp Pro
+              Help shape Chirp Pro
             </h1>
             <p className="mt-2 max-w-[680px] text-[14px] leading-relaxed text-dm-secondary">
-              Chirp stays local-first. Pro is an optional layer for speed, sync,
-              meeting notes, and mobile workflows that need more than one device.
+              Chirp is staying local-first. We are asking whether a paid tier
+              should exist for workflows the local desktop app cannot fully solve:
+              mobile, sync, meeting notes, and faster processing on hardware we
+              can control. If you do not want that, tell us that too.
             </p>
           </div>
           <div className="hidden shrink-0 rounded-xl border border-card-border bg-card-hover px-4 py-3 text-right lg:block">
             <div className="text-[11px] font-semibold uppercase tracking-[0.8px] text-dm-secondary">
-              Priority
+              Default
             </div>
             <div className="mt-1 text-[13px] font-semibold text-dm-primary">
-              Faster, still private by default
+              Local dictation stays core
             </div>
           </div>
         </div>
@@ -119,10 +130,10 @@ export function ProPage() {
         <div className="mb-2 flex items-end justify-between gap-4">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.8px] text-dm-secondary">
-              What should we build first?
+              What should we build, if anything?
             </div>
             <div className="mt-1 text-[13px] text-dm-secondary">
-              Pick the workflows that would make Chirp meaningfully better for you.
+              Pick what would make Chirp better, or vote against Pro entirely.
             </div>
           </div>
           <div className="hidden items-center gap-1.5 rounded-full border border-card-border bg-card px-3 py-1 text-[12px] text-dm-secondary sm:flex">

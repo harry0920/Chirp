@@ -4,7 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getVersion } from '@tauri-apps/api/app'
 import { check } from '@tauri-apps/plugin-updater'
 import { open } from '@tauri-apps/plugin-shell'
-import { Home, BookText, Zap, Sparkles, Settings as SettingsIcon, Check, Minus, Square, X, Heart } from 'lucide-react'
+import { Home, BookText, Zap, Settings as SettingsIcon, Check, Minus, Square, X, Heart } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
@@ -22,7 +22,6 @@ const NAV_ITEMS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'vocabulary', label: 'Vocabulary', icon: BookText },
   { id: 'snippets', label: 'Snippets', icon: Zap },
-  { id: 'pro', label: 'Chirp Pro', icon: Sparkles },
 ]
 
 const PAGES: Record<string, React.FC> = {
@@ -85,6 +84,7 @@ export function Settings() {
   }, [setAboutModalOpen])
 
   const hotkeyKeys = formatHotkey(hotkey)
+  const proActive = settingsPage === 'pro'
 
   const PageComponent = PAGES[settingsPage] ?? HomePage
 
@@ -185,6 +185,22 @@ export function Settings() {
           >
             <Heart size={16} strokeWidth={1.5} />
             Support Chirp
+          </button>
+
+          {/* Chirp Pro */}
+          <button
+            onClick={() => setSettingsPage('pro')}
+            className={`flex items-center gap-[10px] w-full px-[14px] py-[10px] rounded-lg text-[13px] transition-all duration-200 relative mb-3 ${
+              proActive
+                ? 'text-chirp-yellow font-semibold bg-chirp-yellow/[0.08]'
+                : 'text-white/30 hover:text-white/50 hover:bg-white/[0.04]'
+            }`}
+          >
+            {proActive && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-chirp-yellow rounded-r-sm" />
+            )}
+            <BirdMark size={16} color={proActive ? '#F0B723' : 'rgba(255,255,255,0.3)'} />
+            Chirp Pro
           </button>
 
           {/* Hotkey card */}
