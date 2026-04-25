@@ -32,6 +32,8 @@ struct CleanupRegexes {
     percentage: Regex,
     hundred_pct: Regex,
     period_and: Regex,
+    boundary_then_than: Regex,
+    boundary_safe_cap: Regex,
 }
 
 fn regexes() -> &'static CleanupRegexes {
@@ -132,6 +134,8 @@ fn regexes() -> &'static CleanupRegexes {
             percentage: Regex::new(r"(?i)\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\s+percent\b").unwrap(),
             hundred_pct: Regex::new(r"(?i)\b(one )?hundred percent\b").unwrap(),
             period_and: Regex::new(r"\.\s+And\b").unwrap(),
+            boundary_then_than: Regex::new(r"(?i)\b(?P<then>and\s+then)\s+than\s+(?P<gerund>[a-z]+ing)\b").unwrap(),
+            boundary_safe_cap: Regex::new(r"\b(?P<prefix>(?:and|but|or|so|because|since|while|though|although|if|when|that|then|than|like|also|plus|different)\s+)(?P<word>[A-Z][a-z]+(?:'[a-z]+)?)\b").unwrap(),
         }
     })
 }
@@ -409,13 +413,53 @@ pub fn join_cleaned_segments_with_formatting(
     // sentences. This handles both inter-segment and intra-segment cases
     // uniformly — the model can produce ". And" inside a single segment too.
     let sentences = split_into_sentences(&raw_joined);
-    let merged = smart_merge_sentences(&sentences);
+    let merged = repair_vad_boundary_artifacts(&smart_merge_sentences(&sentences));
 
     // Step 4: re-run regex pre-pass on the merged output. cleanup_text is
     // idempotent for already-cleaned text but catches cross-boundary
     // patterns (a filler "um" that survived because it was at a segment
     // boundary) and normalizes whitespace.
     cleanup_text(&merged, smart_formatting)
+}
+
+fn lowercase_first_ascii(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        Some(first) => {
+            let mut out = String::with_capacity(word.len());
+            out.push(first.to_ascii_lowercase());
+            out.push_str(chars.as_str());
+            out
+        }
+        None => String::new(),
+    }
+}
+
+/// Repair artifacts created when VAD splits mid-phrase and the next segment
+/// gets sentence-style capitalization or a duplicated boundary word.
+pub fn repair_vad_boundary_artifacts(text: &str) -> String {
+    let re = regexes();
+
+    let mut result = re
+        .boundary_then_than
+        .replace_all(text, |caps: &regex::Captures| {
+            format!("{} {}", &caps["then"], &caps["gerund"].to_lowercase())
+        })
+        .to_string();
+
+    result = re
+        .boundary_safe_cap
+        .replace_all(&result, |caps: &regex::Captures| {
+            let word = &caps["word"];
+            if is_safe_to_lowercase(&word.to_lowercase()) {
+                format!("{}{}", &caps["prefix"], lowercase_first_ascii(word))
+            } else {
+                caps[0].to_string()
+            }
+        })
+        .to_string();
+
+    result
 }
 
 /// Split text into sentences. A sentence ends at `.`, `!`, or `?` followed
@@ -472,9 +516,7 @@ fn smart_merge_sentences(sentences: &[String]) -> String {
 
     for sent in &sentences[1..] {
         // Look at the running output's tail.
-        let prev_ends_with_terminal = out
-            .trim_end()
-            .ends_with(['.', '!', '?']);
+        let prev_ends_with_terminal = out.trim_end().ends_with(['.', '!', '?']);
 
         // Previous sentence's last alphanumeric token (lowercased).
         let prev_last_word_lc: String = out
@@ -578,10 +620,20 @@ fn is_continuation_start_word(word: &str) -> bool {
     // (often paragraph starters), "yet"/"nor" (rare and often standalone).
     matches!(
         word,
-        "and" | "but" | "or" |
-        "because" | "since" | "while" | "though" | "although" |
-        "however" | "therefore" | "thus" | "hence" |
-        "moreover" | "furthermore"
+        "and"
+            | "but"
+            | "or"
+            | "because"
+            | "since"
+            | "while"
+            | "though"
+            | "although"
+            | "however"
+            | "therefore"
+            | "thus"
+            | "hence"
+            | "moreover"
+            | "furthermore"
     )
 }
 
@@ -608,7 +660,8 @@ fn is_safe_to_lowercase(word: &str) -> bool {
         "just" | "like" | "also" | "then" | "than" | "when" | "they" |
         "them" | "your" | "what" | "some" | "want" | "need" | "been" |
         "were" | "more" | "into" | "give" | "take" | "feel" | "look" |
-        "tell" | "show" | "find" | "kind" | "sort" | "well" |
+        "tell" | "show" | "find" | "kind" | "sort" | "well" | "much" |
+        "we'll" | "we're" | "we've" | "i'll" | "i'm" | "it's" | "that's" |
         // 5-letter common words
         "would" | "could" | "might" | "since" | "while" | "after" |
         "above" | "below" | "where" | "which" | "their" | "those" |
@@ -837,20 +890,29 @@ mod tests {
     #[test]
     fn test_apply_replacements_basic() {
         let v = vocab(&[("Pieter", &["Peter"])]);
-        assert_eq!(apply_replacements("My name is Peter.", &v), "My name is Pieter.");
+        assert_eq!(
+            apply_replacements("My name is Peter.", &v),
+            "My name is Pieter."
+        );
     }
 
     #[test]
     fn test_apply_replacements_case_insensitive() {
         let v = vocab(&[("Pieter", &["Peter"])]);
-        assert_eq!(apply_replacements("PETER and peter", &v), "Pieter and Pieter");
+        assert_eq!(
+            apply_replacements("PETER and peter", &v),
+            "Pieter and Pieter"
+        );
     }
 
     #[test]
     fn test_apply_replacements_word_boundary() {
         // "petersburg" should NOT become "pietersburg"
         let v = vocab(&[("Pieter", &["Peter"])]);
-        assert_eq!(apply_replacements("I went to Petersburg.", &v), "I went to Petersburg.");
+        assert_eq!(
+            apply_replacements("I went to Petersburg.", &v),
+            "I went to Petersburg."
+        );
     }
 
     #[test]
@@ -941,7 +1003,10 @@ mod tests {
     #[test]
     fn test_join_stub_end_just_merges() {
         // The session-3 case: segment ends in "Just." → mid-sentence break.
-        let s = segs(&["Don't do any coding right now. Just.", "See if it's viable."]);
+        let s = segs(&[
+            "Don't do any coding right now. Just.",
+            "See if it's viable.",
+        ]);
         assert_eq!(
             join_cleaned_segments(&s),
             "Don't do any coding right now. Just see if it's viable."
@@ -952,19 +1017,13 @@ mod tests {
     fn test_join_stub_end_preposition_merges() {
         // "I went to." should merge with whatever comes next.
         let s = segs(&["I went to.", "the store."]);
-        assert_eq!(
-            join_cleaned_segments(&s),
-            "I went to the store."
-        );
+        assert_eq!(join_cleaned_segments(&s), "I went to the store.");
     }
 
     #[test]
     fn test_join_stub_end_modal_merges() {
         let s = segs(&["I will.", "make it work."]);
-        assert_eq!(
-            join_cleaned_segments(&s),
-            "I will make it work."
-        );
+        assert_eq!(join_cleaned_segments(&s), "I will make it work.");
     }
 
     #[test]
@@ -1001,10 +1060,7 @@ mod tests {
         // "I went to." → stub. "Paris" should NOT be lowercased.
         // (Paris is 5 chars and not in the safe-to-lowercase list.)
         let s = segs(&["I went to.", "Paris last summer."]);
-        assert_eq!(
-            join_cleaned_segments(&s),
-            "I went to Paris last summer."
-        );
+        assert_eq!(join_cleaned_segments(&s), "I went to Paris last summer.");
     }
 
     #[test]
@@ -1070,7 +1126,8 @@ mod tests {
         );
         // The merge should have happened: "Just" → "see" continuation
         assert!(
-            result.contains("Just see if it's viable") || result.contains("just see if it's viable"),
+            result.contains("Just see if it's viable")
+                || result.contains("just see if it's viable"),
             "expected 'Just see if it's viable' merge, got: {result}"
         );
     }
@@ -1099,6 +1156,41 @@ mod tests {
     }
 
     #[test]
+    fn test_repair_boundary_safe_capitalization() {
+        let result = repair_vad_boundary_artifacts(
+            "The fact that it's that Much like work is not good, but like Have it derived.",
+        );
+        assert_eq!(
+            result,
+            "The fact that it's that much like work is not good, but like have it derived."
+        );
+    }
+
+    #[test]
+    fn test_repair_boundary_then_than_gerund() {
+        let result = repair_vad_boundary_artifacts(
+            "We should communicate that clearly in wireframing first, and then Than implementing a brand kit.",
+        );
+        assert_eq!(
+            result,
+            "We should communicate that clearly in wireframing first, and then implementing a brand kit."
+        );
+    }
+
+    #[test]
+    fn test_repair_boundary_preserves_proper_nouns() {
+        let result =
+            repair_vad_boundary_artifacts("We can send this to SiteLift and Google tomorrow.");
+        assert_eq!(result, "We can send this to SiteLift and Google tomorrow.");
+    }
+
+    #[test]
+    fn test_repair_boundary_preserves_title_case_names() {
+        let result = repair_vad_boundary_artifacts("I read The Verge today.");
+        assert_eq!(result, "I read The Verge today.");
+    }
+
+    #[test]
     fn test_join_session_5_blast_radius() {
         // The "Chirp app" test session — even if per-segment cleanup
         // paraphrases within a segment, it should NOT add cross-segment
@@ -1110,7 +1202,8 @@ mod tests {
         let result = join_cleaned_segments(&s);
         // "for the." → stub end, should merge
         assert!(
-            result.contains("overhaul for the text injection") || result.contains("overhaul for the Text injection"),
+            result.contains("overhaul for the text injection")
+                || result.contains("overhaul for the Text injection"),
             "expected stub-end merge of 'for the.' + 'Text injection', got: {result}"
         );
         // Should not have invented "Chirp app:" prefix because the input

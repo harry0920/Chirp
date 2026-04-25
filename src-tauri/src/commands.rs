@@ -45,14 +45,14 @@ fn join_vad_segments(segments: &[String]) -> String {
         }
 
         // Check if previous segment ended with sentence-ending punctuation
-        let prev_ended_sentence = result.ends_with('.')
-            || result.ends_with('?')
-            || result.ends_with('!');
+        let prev_ended_sentence =
+            result.ends_with('.') || result.ends_with('?') || result.ends_with('!');
 
         // If previous segment ended with a period but was very short (1-3 words),
         // it's likely a VAD artifact — strip the period
         if result.ends_with('.') {
-            let last_segment_words = result.rsplit(' ')
+            let last_segment_words = result
+                .rsplit(' ')
                 .take_while(|w| !w.ends_with('.') && !w.ends_with('?') && !w.ends_with('!'))
                 .count();
             // If the trailing sentence fragment is 1-3 words, strip the period
@@ -119,7 +119,6 @@ pub struct RecordingStartTime(pub std::sync::Mutex<Option<Instant>>);
 
 /// Holds the active flag for the current audio stream so we can deactivate zombie callbacks.
 pub struct StreamActiveState(pub std::sync::Mutex<Option<audio::StreamActiveFlag>>);
-
 
 #[tauri::command]
 pub fn show_settings(app: tauri::AppHandle) -> Result<(), String> {
@@ -235,7 +234,9 @@ pub async fn update_settings(
 }
 
 #[tauri::command]
-pub async fn get_vocabulary(state: State<'_, SharedState>) -> Result<Vec<crate::state::VocabEntry>, String> {
+pub async fn get_vocabulary(
+    state: State<'_, SharedState>,
+) -> Result<Vec<crate::state::VocabEntry>, String> {
     let s = state.lock().await;
     Ok(s.vocabulary.clone())
 }
@@ -356,7 +357,10 @@ pub async fn start_recording(
 
             // Deactivate any zombie callbacks from the stale stream
             {
-                let active = stream_active_state.0.lock().unwrap_or_else(|e| e.into_inner());
+                let active = stream_active_state
+                    .0
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
                 if let Some(ref flag) = *active {
                     flag.store(false, Ordering::SeqCst);
                 }
@@ -374,7 +378,10 @@ pub async fn start_recording(
                 }
             }
             {
-                let mut handle = vad_receiver_handle.0.lock().unwrap_or_else(|e| e.into_inner());
+                let mut handle = vad_receiver_handle
+                    .0
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
                 if let Some(h) = handle.take() {
                     let _ = h.join();
                 }
@@ -405,7 +412,10 @@ pub async fn start_recording(
     // Deactivate any zombie callbacks from a previous stream before clearing the buffer.
     // On macOS, cpal/CoreAudio callbacks can outlive the Stream drop.
     {
-        let prev_active = stream_active_state.0.lock().unwrap_or_else(|e| e.into_inner());
+        let prev_active = stream_active_state
+            .0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if let Some(ref flag) = *prev_active {
             flag.store(false, std::sync::atomic::Ordering::SeqCst);
         }
@@ -413,8 +423,15 @@ pub async fn start_recording(
 
     // Clear audio buffer and VAD transcripts
     buffer.lock().unwrap_or_else(|e| e.into_inner()).clear();
-    vad_transcripts.lock().unwrap_or_else(|e| e.into_inner()).clear();
-    vad_cleaned.0.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    vad_transcripts
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clear();
+    vad_cleaned
+        .0
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clear();
 
     // Record wall-clock start time for sample rate sanity check
     *recording_start.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
@@ -437,7 +454,8 @@ pub async fn start_recording(
         match audio::create_vad_state(&vad_model.to_string_lossy(), tx) {
             Some(vs) => {
                 let vad_arc = Arc::new(std::sync::Mutex::new(vs));
-                *vad_flush_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(vad_arc.clone());
+                *vad_flush_handle.0.lock().unwrap_or_else(|e| e.into_inner()) =
+                    Some(vad_arc.clone());
 
                 let transcripts = vad_transcripts.inner().clone();
                 let cleaned = vad_cleaned.0.clone();
@@ -449,10 +467,15 @@ pub async fn start_recording(
                     .spawn(move || {
                         let mut seg_idx = 0u32;
                         while let Ok(segment_audio) = rx.recv() {
-                            if segment_audio.is_empty() { break; } // poison pill
+                            if segment_audio.is_empty() {
+                                break;
+                            } // poison pill
                             let dur = segment_audio.len() as f32 / 16000.0;
-                            log::info!("VAD segment {seg_idx}: {:.1}s ({} samples)",
-                                dur, segment_audio.len());
+                            log::info!(
+                                "VAD segment {seg_idx}: {:.1}s ({} samples)",
+                                dur,
+                                segment_audio.len()
+                            );
 
                             // Mark VAD as active so stop_recording uses streamed output.
                             let s_handle = state_for_thread.clone();
@@ -474,26 +497,34 @@ pub async fn start_recording(
                                 continue;
                             }
                             log::info!("VAD segment {seg_idx} transcript: '{raw}'");
-                            transcripts.lock().unwrap_or_else(|e| e.into_inner())
+                            transcripts
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner())
                                 .push(raw.clone());
 
                             // Regex/vocab pre-pass. Snippet expansion is
                             // deferred to after LLM cleanup so the LLM
                             // doesn't mangle URLs / emails / identifiers.
                             let after_regex = cleanup::cleanup_text(&raw, smart_fmt_for_vad);
-                            let after_vocab = cleanup::apply_replacements(&after_regex, &vocab_for_vad);
+                            let after_vocab =
+                                cleanup::apply_replacements(&after_regex, &vocab_for_vad);
 
                             // No per-segment LLM cleanup — the joined text
                             // gets a single polish pass in stop_recording
                             // after the hotkey is released.
-                            cleaned.lock().unwrap_or_else(|e| e.into_inner())
+                            cleaned
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner())
                                 .push(after_vocab);
                             seg_idx += 1;
                         }
                         log::info!("VAD receiver thread exiting after {seg_idx} segments");
                     })
                     .ok();
-                *vad_receiver_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = handle;
+                *vad_receiver_handle
+                    .0
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner()) = handle;
                 Some(vad_arc)
             }
             None => {
@@ -515,9 +546,16 @@ pub async fn start_recording(
         vad_arc,
     ) {
         Ok((stream, error_flag, active_flag, resampler_state)) => {
-            *stream_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(StreamWrapper(stream));
-            *stream_error_state.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(error_flag);
-            *stream_active_state.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(active_flag);
+            *stream_handle.0.lock().unwrap_or_else(|e| e.into_inner()) =
+                Some(StreamWrapper(stream));
+            *stream_error_state
+                .0
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = Some(error_flag);
+            *stream_active_state
+                .0
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = Some(active_flag);
             *resampler_flush.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(resampler_state);
             None
         }
@@ -579,7 +617,8 @@ pub async fn stop_recording(
     let start_time = Instant::now();
 
     // Grab wall-clock recording duration for sample rate sanity check
-    let wall_clock_secs = recording_start.0
+    let wall_clock_secs = recording_start
+        .0
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .take()
@@ -588,7 +627,10 @@ pub async fn stop_recording(
     // Deactivate callbacks BEFORE dropping the stream — this ensures zombie
     // callbacks from macOS CoreAudio cannot write to the buffer anymore.
     {
-        let active = stream_active_state.0.lock().unwrap_or_else(|e| e.into_inner());
+        let active = stream_active_state
+            .0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if let Some(ref flag) = *active {
             flag.store(false, Ordering::SeqCst);
         }
@@ -609,13 +651,16 @@ pub async fn stop_recording(
     }
 
     // Check if the audio stream reported an error (e.g. device disconnected)
-    let had_stream_error = stream_error_state.0
+    let had_stream_error = stream_error_state
+        .0
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .as_ref()
         .map_or(false, |flag| flag.load(Ordering::SeqCst));
     if had_stream_error {
-        log::warn!("Audio stream reported an error during recording — device may have disconnected");
+        log::warn!(
+            "Audio stream reported an error during recording — device may have disconnected"
+        );
     }
 
     // Flush VAD to capture the final speech segment, then shut down receiver thread
@@ -634,7 +679,10 @@ pub async fn stop_recording(
     }
     // Join receiver thread (with timeout via try_join)
     {
-        let mut handle = vad_receiver_handle.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut handle = vad_receiver_handle
+            .0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if let Some(h) = handle.take() {
             if h.join().is_err() {
                 log::warn!("VAD receiver thread panicked");
@@ -693,12 +741,16 @@ pub async fn stop_recording(
     let rms = (audio_data.iter().map(|s| s * s).sum::<f32>() / audio_data.len() as f32).sqrt();
     let peak = audio_data.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
     let nonzero = audio_data.iter().filter(|&&s| s.abs() > 0.001).count();
-    log::info!("Audio level: rms={rms:.6}, peak={peak:.4}, nonzero={nonzero}/{sample_count} ({:.1}%)",
-        nonzero as f64 / sample_count as f64 * 100.0);
+    log::info!(
+        "Audio level: rms={rms:.6}, peak={peak:.4}, nonzero={nonzero}/{sample_count} ({:.1}%)",
+        nonzero as f64 / sample_count as f64 * 100.0
+    );
 
     // If the buffer is near-silent and the stream had an error, the mic likely disconnected
     if rms < 0.0001 && had_stream_error {
-        log::error!("Silent buffer with stream error — audio device likely disconnected during recording");
+        log::error!(
+            "Silent buffer with stream error — audio device likely disconnected during recording"
+        );
         let mut s = state.lock().await;
         s.recording_state = RecordingState::Idle;
         return Err("mic_disconnected".into());
@@ -711,7 +763,17 @@ pub async fn stop_recording(
     // Grab what we need from state before entering blocking thread.
     // Clone the Arc<SherpaRecognizer> so we can release the state lock
     // before the expensive transcription step.
-    let (recognizer, smart_fmt, vocab, snips, ai_cleanup, llm_port, tone_mode, http_client, vad_was_active) = {
+    let (
+        recognizer,
+        smart_fmt,
+        vocab,
+        snips,
+        ai_cleanup,
+        llm_port,
+        tone_mode,
+        http_client,
+        vad_was_active,
+    ) = {
         let mut s = state.lock().await;
         let rec = s.recognizer.clone().ok_or("model_not_loaded".to_string())?;
         let vad_was_active = s.vad_was_active;
@@ -768,7 +830,9 @@ pub async fn stop_recording(
         // cross-boundary fillers. See cleanup::join_cleaned_segments_with_formatting.
         let joined = cleanup::join_cleaned_segments_with_formatting(&vad_cleaned_texts, smart_fmt);
         if joined.trim().is_empty() {
-            log::warn!("VAD cleaned transcripts all whitespace after join — returning empty result");
+            log::warn!(
+                "VAD cleaned transcripts all whitespace after join — returning empty result"
+            );
             let mut s = state.lock().await;
             s.recording_state = RecordingState::Idle;
             return Err("transcription_failed".into());
@@ -867,6 +931,10 @@ pub async fn stop_recording(
     } else {
         formatted
     };
+
+    // One last deterministic boundary pass catches artifacts the LLM may
+    // preserve from VAD splits, e.g. "that Much" or "and then Than".
+    let result = cleanup::repair_vad_boundary_artifacts(&result);
 
     // Snippet expansion happens AFTER LLM cleanup so expansions (URLs,
     // emails, addresses) survive as literal text — the LLM would otherwise
@@ -986,12 +1054,15 @@ pub async fn stop_recording(
     // Track dictation_completed telemetry (no-op if help_improve is off)
     {
         use tauri_plugin_aptabase::EventTracker;
-        let _ = app_handle.track_event("dictation_completed", Some(serde_json::json!({
-            "duration_seconds": (duration_ms as f64 / 1000.0),
-            "word_count": word_count,
-            "used_ai_cleanup": was_cleaned_up,
-            "used_vocabulary": had_vocabulary,
-        })));
+        let _ = app_handle.track_event(
+            "dictation_completed",
+            Some(serde_json::json!({
+                "duration_seconds": (duration_ms as f64 / 1000.0),
+                "word_count": word_count,
+                "used_ai_cleanup": was_cleaned_up,
+                "used_vocabulary": had_vocabulary,
+            })),
+        );
     }
 
     // Notify all windows (including settings) that history changed
@@ -1024,7 +1095,10 @@ pub async fn cancel_recording(
 ) -> Result<(), String> {
     // Deactivate zombie callbacks before dropping the stream
     {
-        let active = stream_active_state.0.lock().unwrap_or_else(|e| e.into_inner());
+        let active = stream_active_state
+            .0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if let Some(ref flag) = *active {
             flag.store(false, Ordering::SeqCst);
         }
@@ -1069,9 +1143,12 @@ pub async fn download_model(
     // Track model_downloaded telemetry (no-op if help_improve is off)
     {
         use tauri_plugin_aptabase::EventTracker;
-        let _ = app_handle.track_event("model_downloaded", Some(serde_json::json!({
-            "model": &model,
-        })));
+        let _ = app_handle.track_event(
+            "model_downloaded",
+            Some(serde_json::json!({
+                "model": &model,
+            })),
+        );
     }
 
     // Load the recognizer into app state immediately so recording works
@@ -1138,7 +1215,8 @@ pub async fn test_microphone(
     buffer.lock().unwrap_or_else(|e| e.into_inner()).clear();
 
     // Start capture
-    let (stream, _error_flag, active_flag, _resampler_state) = audio::start_capture(&device_id, buffer.inner().clone(), app_handle, None)?;
+    let (stream, _error_flag, active_flag, _resampler_state) =
+        audio::start_capture(&device_id, buffer.inner().clone(), app_handle, None)?;
     *stream_handle.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(StreamWrapper(stream));
 
     // Record for 3 seconds
@@ -1166,9 +1244,7 @@ pub async fn test_microphone(
 // ── LLM commands ──────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn get_llm_status(
-    state: State<'_, SharedState>,
-) -> Result<llm::LlmStatus, String> {
+pub async fn get_llm_status(state: State<'_, SharedState>) -> Result<llm::LlmStatus, String> {
     let mut s = state.lock().await;
     let mut server_running = s.llm_port.is_some();
 
@@ -1215,9 +1291,7 @@ pub async fn download_llm(
 }
 
 #[tauri::command]
-pub async fn start_llm(
-    state: State<'_, SharedState>,
-) -> Result<(), String> {
+pub async fn start_llm(state: State<'_, SharedState>) -> Result<(), String> {
     {
         let s = state.lock().await;
         if s.llm_port.is_some() {
@@ -1229,7 +1303,8 @@ pub async fn start_llm(
     let port = {
         let listener = std::net::TcpListener::bind("127.0.0.1:0")
             .map_err(|e| format!("Failed to find free port: {e}"))?;
-        listener.local_addr()
+        listener
+            .local_addr()
             .map_err(|e| format!("Failed to get local address: {e}"))?
             .port()
     };
@@ -1247,9 +1322,7 @@ pub async fn start_llm(
 }
 
 #[tauri::command]
-pub async fn stop_llm(
-    state: State<'_, SharedState>,
-) -> Result<(), String> {
+pub async fn stop_llm(state: State<'_, SharedState>) -> Result<(), String> {
     let mut s = state.lock().await;
     if let Some(ref mut child) = s.llm_process {
         llm::stop_server(child).await;
@@ -1273,19 +1346,23 @@ pub async fn test_llm_cleanup(
             s.http_client.clone(),
         )
     };
-    llm::cleanup_text(port, &text, &mode.unwrap_or_else(|| "message".to_string()), &http_client).await
+    llm::cleanup_text(
+        port,
+        &text,
+        &mode.unwrap_or_else(|| "message".to_string()),
+        &http_client,
+    )
+    .await
 }
 
 #[tauri::command]
 pub async fn play_completion_sound() -> Result<(), String> {
     tokio::task::spawn_blocking(|| {
         let cursor = Cursor::new(CHIRP_SOUND);
-        let (_stream, stream_handle) = rodio::OutputStream::try_default()
-            .map_err(|e| format!("Audio output error: {e}"))?;
-        let sink = rodio::Sink::try_new(&stream_handle)
-            .map_err(|e| format!("Sink error: {e}"))?;
-        let source = rodio::Decoder::new(cursor)
-            .map_err(|e| format!("Decode error: {e}"))?;
+        let (_stream, stream_handle) =
+            rodio::OutputStream::try_default().map_err(|e| format!("Audio output error: {e}"))?;
+        let sink = rodio::Sink::try_new(&stream_handle).map_err(|e| format!("Sink error: {e}"))?;
+        let source = rodio::Decoder::new(cursor).map_err(|e| format!("Decode error: {e}"))?;
         sink.append(source);
         sink.sleep_until_end();
         Ok(())
@@ -1295,9 +1372,7 @@ pub async fn play_completion_sound() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn get_hotkey_status(
-    state: State<'_, SharedState>,
-) -> Result<String, String> {
+pub async fn get_hotkey_status(state: State<'_, SharedState>) -> Result<String, String> {
     let s = state.lock().await;
     let status = match s.hotkey_status {
         crate::state::HotkeyStatus::Idle => "idle",
@@ -1350,10 +1425,7 @@ pub async fn dismiss_announcement(id: String) -> Result<(), String> {
 // ── Feedback command ───────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn send_feedback(
-    text: String,
-    state: State<'_, SharedState>,
-) -> Result<(), String> {
+pub async fn send_feedback(text: String, state: State<'_, SharedState>) -> Result<(), String> {
     crate::feedback::send_feedback_command(text, state.inner()).await
 }
 
@@ -1380,11 +1452,11 @@ pub async fn request_accessibility_permission() -> Result<(), String> {
     {
         use cocoa::base::nil;
         use cocoa::foundation::{NSDictionary, NSString};
+        use objc::class;
         use objc::msg_send;
+        use objc::runtime::Object;
         use objc::sel;
         use objc::sel_impl;
-        use objc::class;
-        use objc::runtime::Object;
         extern "C" {
             fn AXIsProcessTrustedWithOptions(options: *const Object) -> bool;
         }
@@ -1417,4 +1489,3 @@ pub async fn capture_next_key(
     let _ = crate::hotkey::start(&hotkey_str, app_handle);
     result
 }
-
