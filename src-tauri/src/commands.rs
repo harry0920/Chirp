@@ -419,7 +419,6 @@ pub async fn start_recording(
     let recognizer_for_vad = s.recognizer.clone();
     let smart_fmt_for_vad = s.settings.smart_formatting;
     let vocab_for_vad = s.vocabulary.clone();
-    let snips_for_vad = s.snippets.clone();
     s.recording_state = RecordingState::Recording;
     s.vad_was_active = false;
     drop(s);
@@ -474,17 +473,17 @@ pub async fn start_recording(
                             transcripts.lock().unwrap_or_else(|e| e.into_inner())
                                 .push(raw.clone());
 
-                            // Regex/vocab/snippet pre-pass — same as the
-                            // fallback path does in stop_recording.
+                            // Regex/vocab pre-pass. Snippet expansion is
+                            // deferred to after LLM cleanup so the LLM
+                            // doesn't mangle URLs / emails / identifiers.
                             let after_regex = cleanup::cleanup_text(&raw, smart_fmt_for_vad);
                             let after_vocab = cleanup::apply_replacements(&after_regex, &vocab_for_vad);
-                            let after_snips = snippets::apply_snippets(&after_vocab, &snips_for_vad);
 
                             // No per-segment LLM cleanup — the joined text
                             // gets a single polish pass in stop_recording
                             // after the hotkey is released.
                             cleaned.lock().unwrap_or_else(|e| e.into_inner())
-                                .push(after_snips);
+                                .push(after_vocab);
                             seg_idx += 1;
                         }
                         log::info!("VAD receiver thread exiting after {seg_idx} segments");
@@ -825,11 +824,11 @@ pub async fn stop_recording(
             // to its canonical `term`, case-insensitive at word boundaries.
             let after_replace = cleanup::apply_replacements(&formatted, &vocab);
 
-            // Apply snippet expansions BEFORE AI cleanup
-            let after_snips = snippets::apply_snippets(&after_replace, &snips);
+            // Snippet expansion is deferred to after LLM cleanup (below)
+            // so the LLM doesn't mangle URLs / emails / identifiers.
 
-            log::info!("After regex+replace+snips: '{after_snips}'");
-            Ok(after_snips)
+            log::info!("After regex+replace: '{after_replace}'");
+            Ok(after_replace)
         })
         .await
         .map_err(|e| format!("Task failed: {e}"))?
@@ -867,6 +866,11 @@ pub async fn stop_recording(
     } else {
         formatted
     };
+
+    // Snippet expansion happens AFTER LLM cleanup so expansions (URLs,
+    // emails, addresses) survive as literal text — the LLM would otherwise
+    // "correct" things like "chirptype.com" into "chirptype. Com".
+    let result = snippets::apply_snippets(&result, &snips);
 
     let duration_ms = start_time.elapsed().as_millis() as u64;
     let word_count = result.split_whitespace().count();

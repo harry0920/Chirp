@@ -16,11 +16,13 @@ export function TrayPopup() {
 
   // Reload all state fresh from backend each time the popup is shown
   useEffect(() => {
-    const unlisten = listen('tray-popup-shown', async () => {
+    const refresh = async () => {
       try {
-        const [settings, history] = await Promise.all([
+        const [settings, history, modelStatus, llmStatus] = await Promise.all([
           invoke('get_settings'),
           invoke('get_history'),
+          invoke<{ model: string; downloaded: boolean }>('get_model_status', { model: 'parakeet-tdt-0.6b' }),
+          invoke<{ binaryDownloaded: boolean; modelDownloaded: boolean; serverRunning: boolean }>('get_llm_status'),
         ])
         if (settings && typeof settings === 'object') {
           useAppStore.getState().updateSettings(settings as Partial<ReturnType<typeof useAppStore.getState>>)
@@ -28,8 +30,22 @@ export function TrayPopup() {
         if (Array.isArray(history)) {
           useAppStore.getState().setHistory(history as TranscriptionEntry[])
         }
+        if (modelStatus?.downloaded) {
+          useAppStore.getState().updateSettings({
+            modelDownloaded: {
+              ...useAppStore.getState().modelDownloaded,
+              [modelStatus.model]: true,
+            },
+          })
+        }
+        if (llmStatus) {
+          useAppStore.getState().setLlmDownloaded(llmStatus.binaryDownloaded && llmStatus.modelDownloaded)
+          useAppStore.getState().setLlmReady(llmStatus.serverRunning)
+        }
       } catch { /* backend unavailable */ }
-    })
+    }
+    refresh()
+    const unlisten = listen('tray-popup-shown', refresh)
     return () => { unlisten.then((f) => f()) }
   }, [])
 

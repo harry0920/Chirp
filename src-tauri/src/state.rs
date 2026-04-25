@@ -47,7 +47,7 @@ pub struct Settings {
     #[serde(default)]
     pub ai_cleanup: bool,
     #[serde(default = "default_overlay_position")]
-    pub overlay_position: String,
+    pub overlay_position: serde_json::Value,
     #[serde(default = "default_true")]
     pub show_passive_overlay: bool,
     #[serde(default = "default_tone_mode")]
@@ -68,8 +68,8 @@ fn default_cleanup_model() -> String {
     "chirp-v2".into()
 }
 
-fn default_overlay_position() -> String {
-    "bottom".into()
+fn default_overlay_position() -> serde_json::Value {
+    serde_json::Value::String("bottom".into())
 }
 
 fn default_true() -> bool {
@@ -92,7 +92,7 @@ impl Default for Settings {
             model: "parakeet-tdt-0.6b".into(),
             onboarding_complete: false,
             ai_cleanup: true,
-            overlay_position: "bottom".into(),
+            overlay_position: serde_json::Value::String("bottom".into()),
             show_passive_overlay: true,
             tone_mode: "message".into(),
             history_retention_days: 0,
