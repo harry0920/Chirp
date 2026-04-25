@@ -115,14 +115,6 @@ export function ProPage() {
               can control. If you do not want that, tell us that too.
             </p>
           </div>
-          <div className="hidden shrink-0 rounded-xl border border-card-border bg-card-hover px-4 py-3 text-right lg:block">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.8px] text-dm-secondary">
-              Default
-            </div>
-            <div className="mt-1 text-[13px] font-semibold text-dm-primary">
-              Local dictation stays core
-            </div>
-          </div>
         </div>
       </section>
 
