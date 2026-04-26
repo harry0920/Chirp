@@ -5,13 +5,11 @@ All notable changes to Chirp.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries are dated and reference the commit hash for full diff context.
 
-## [1.3.3] — 2026-04-25
+## [1.3.4] — 2026-04-25
 
-v1.3.0–v1.3.2 were tagged but never shipped: v1.3.0 broke on the macOS
-build, v1.3.1 had a pending Windows-launch crash, and v1.3.2's Windows
-build failed at link time on a sherpa-onnx C-lib / Rust-crate version
-mismatch. v1.3.3 carries all of the app-side changes plus all the CI
-fixes.
+v1.3.0–v1.3.3 were tagged but never shipped: each release uncovered a
+different Windows-side CI issue. v1.3.4 carries all of the app-side
+changes plus the full set of CI fixes.
 
 ### 2026-04-25 — Smart Cleanup CPU fallback, Gemma 4 disk reclaim, llm-server log file, macOS + Windows CI fixes
 
@@ -57,6 +55,12 @@ fixes.
   hit this because its dylibs resolve symbols lazily at load time and
   our code never calls those new APIs. Bumped both jobs'
   `SHERPA_VERSION` to 1.12.36 to match the Rust crate.
+- **Windows bundle error: missing cargs.dll resource (CI).** With the
+  bump to sherpa-onnx 1.12.36 the Windows MT-Release archive no longer
+  ships `cargs.dll` (it's an internal CLI-tools dependency we never
+  used at runtime; sherpa-onnx made it static). Removed it from
+  `tauri.windows.conf.json`'s bundle resource list so Tauri stops
+  trying to bundle a file that doesn't exist.
 
 ### 2026-04-21 — Hotkey rewrite, stuck-key fix, Qwen 3 1.7B cleanup LLM, non-English preservation
 
