@@ -104,6 +104,12 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # sherpa-onnx-sys 1.12.36's build script defaults to a flat
+          # <manifest>/sherpa-onnx-lib lookup; our dylibs live in the
+          # macos/ subdir so the build script panics with "No shared
+          # runtime libraries found" without this override. Our own
+          # build.rs already handles the subdir layout.
+          SHERPA_ONNX_LIB_DIR: ${{ github.workspace }}/src-tauri/sherpa-onnx-lib/macos
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Chirp ${{ github.ref_name }}"
