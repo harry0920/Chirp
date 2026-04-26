@@ -5,7 +5,28 @@ All notable changes to Chirp.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries are dated and reference the commit hash for full diff context.
 
-## [1.3.0] — Unreleased
+## [1.3.0] — 2026-04-25
+
+### 2026-04-25 — Smart Cleanup CPU fallback, Gemma 4 disk reclaim, llm-server log file
+
+#### Fixed
+- **Smart Cleanup now starts on machines without a usable GPU.**
+  `start_server` previously always passed `--gpu-layers 99 --flash-attn on`
+  and discarded stdout/stderr, so on systems without a working Vulkan
+  runtime (older drivers, some iGPUs, headless VMs) llama-server died
+  silently and the user got an opaque "failed to start within 30s".
+  We now try GPU first and on failure retry once on CPU
+  (`--gpu-layers 0 --flash-attn off`). Both attempts stream stdout +
+  stderr to `<config_dir>/llm-server.log` so we have something to
+  triage when users report problems.
+  `start_server` also `try_wait()`s mid-poll so a subprocess that
+  exits during model load surfaces as an error within ~500 ms instead
+  of waiting the full 30 s.
+- **v1.2.6 → v1.3.0 upgrade reclaims ~3.1 GB.** The cleanup-old-models
+  migration list was missing `gemma-4-E2B-it-Q4_K_M.gguf`, so users
+  upgrading from v1.2.6 kept the old Gemma cleanup model on disk
+  forever. Added it to the list; the file is now removed on first
+  launch of v1.3.0 alongside the other superseded LLMs.
 
 ### 2026-04-21 — Hotkey rewrite, stuck-key fix, Qwen 3 1.7B cleanup LLM, non-English preservation
 

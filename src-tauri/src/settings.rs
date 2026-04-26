@@ -73,12 +73,15 @@ fn vocabulary_path() -> PathBuf {
     config_dir().join("vocabulary.json")
 }
 
-/// Remove old cleanup-model files from previous versions:
-///   - Qwen 2.5 3B GGUF (pre-Gemma)
-///   - FLAN-T5 chirp-cleanup directory (pre-Gemma)
-///   - chirp-cleanup-v2 fine-tune (superseded)
-///   - Qwen3-0.6B GGUF (superseded)
-///   - Ministral 3 8B GGUF (tried in v1.3.0 dev, reverted to Gemma 4 E2B)
+/// Remove old cleanup-model files from previous versions. The current cleanup
+/// model is Qwen 3 1.7B Q4_K_M (~1.1 GB); everything below was used in some
+/// earlier release or v1.3.0-dev iteration and should be reclaimed on upgrade.
+///   - `qwen2.5-3b-instruct-q4_k_m.gguf` — v1.2.5 cleanup model (~1.9 GB)
+///   - `chirp-cleanup-0.6b-q4_k_m.gguf` — chirp-cleanup-v2 fine-tune
+///   - `Qwen3-0.6B-Q4_K_M.gguf` — superseded by Qwen 3 1.7B
+///   - `Ministral-3-8B-Instruct-2512-Q4_K_M.gguf` — tried in v1.3.0 dev
+///   - `gemma-4-E2B-it-Q4_K_M.gguf` — v1.2.6 cleanup model (~3.1 GB)
+///   - FLAN-T5 chirp-cleanup directory — pre-Qwen experimental backend
 fn cleanup_old_models() {
     let llm_dir = config_dir().join("llm");
 
@@ -87,6 +90,7 @@ fn cleanup_old_models() {
         "chirp-cleanup-0.6b-q4_k_m.gguf",
         "Qwen3-0.6B-Q4_K_M.gguf",
         "Ministral-3-8B-Instruct-2512-Q4_K_M.gguf",
+        "gemma-4-E2B-it-Q4_K_M.gguf",
     ];
     for name in old_files {
         let path = llm_dir.join(name);
@@ -141,7 +145,10 @@ pub fn load_settings() -> Settings {
         let _ = save_settings(&settings);
     }
 
-    // Migrate old cleanup model to chirp-cleanup-v2 (fine-tuned Qwen3 0.6B)
+    // Force the cleanup_model identifier to "chirp-v2" — the only value the
+    // app currently understands. The actual model bytes are Qwen 3 1.7B
+    // (see llm::MODEL_FILENAME); the setting field is kept as a forward-compat
+    // hook so we can swap the underlying model without a migration dance.
     if settings.cleanup_model != "chirp-v2" {
         log::info!("Migrated cleanup_model '{}' → 'chirp-v2'", settings.cleanup_model);
         settings.cleanup_model = "chirp-v2".into();

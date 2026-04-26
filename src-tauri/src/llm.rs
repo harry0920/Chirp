@@ -511,8 +511,19 @@ pub async fn download_model(app_handle: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Start llama-server on a given port. Returns the child process.
-pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
+/// Path to the llama-server log file (stdout + stderr from the subprocess).
+/// Truncated on each startup attempt so the file reflects the most recent run.
+fn server_log_path() -> std::path::PathBuf {
+    settings::config_dir().join("llm-server.log")
+}
+
+/// Start llama-server with explicit GPU/flash-attn settings. Internal helper —
+/// callers should use [`start_server`], which handles the GPU→CPU fallback.
+async fn start_server_with(
+    port: u16,
+    gpu_layers: u32,
+    flash_attn: bool,
+) -> Result<tokio::process::Child, String> {
     let binary = binary_path();
     let model = model_path();
 
@@ -527,6 +538,24 @@ pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
         .map(|n| n.get())
         .unwrap_or(4);
 
+    // Capture stdout+stderr to a log file so users (and us) have something to
+    // look at when llama-server fails to start. Truncated per attempt; on the
+    // CPU fallback the file gets overwritten so the second attempt's logs are
+    // what we surface.
+    let log_path = server_log_path();
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let log_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&log_path)
+        .map_err(|e| format!("Failed to open llm-server log: {e}"))?;
+    let log_clone = log_file
+        .try_clone()
+        .map_err(|e| format!("Failed to clone llm-server log handle: {e}"))?;
+
     let mut cmd = tokio::process::Command::new(binary.to_string_lossy().to_string());
     cmd.arg("--model")
         .arg(model.to_string_lossy().to_string())
@@ -539,9 +568,9 @@ pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
         .arg("--threads")
         .arg(n_threads.to_string())
         .arg("--gpu-layers")
-        .arg("99")
+        .arg(gpu_layers.to_string())
         .arg("--flash-attn")
-        .arg("on")
+        .arg(if flash_attn { "on" } else { "off" })
         .arg("--batch-size")
         .arg("512")
         .arg("--parallel")
@@ -555,9 +584,8 @@ pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
         // the default llama-server template doesn't match its training format
         // and causes mode-collapse on instruct tasks.
         .arg("--jinja")
-        .arg("--log-disable")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
+        .stdout(std::process::Stdio::from(log_file))
+        .stderr(std::process::Stdio::from(log_clone));
 
     #[cfg(windows)]
     {
@@ -575,11 +603,21 @@ pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
     let client = reqwest::Client::new();
 
     for _ in 0..60 {
+        // Bail early if the subprocess already died (e.g. Vulkan init failed).
+        if let Ok(Some(status)) = child.try_wait() {
+            return Err(format!(
+                "llama-server exited during startup ({status}); see {}",
+                log_path.display()
+            ));
+        }
+
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         if let Ok(resp) = client.get(&health_url).send().await {
             if let Ok(body) = resp.json::<serde_json::Value>().await {
                 if body.get("status").and_then(|s| s.as_str()) == Some("ok") {
-                    log::info!("llama-server ready on port {port}");
+                    log::info!(
+                        "llama-server ready on port {port} (gpu_layers={gpu_layers}, flash_attn={flash_attn})"
+                    );
                     return Ok(child);
                 }
             }
@@ -591,7 +629,35 @@ pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
     let _ = child.wait().await;
     log::warn!("Killed llama-server after startup timeout");
 
-    Err("llama-server failed to start within 30s".to_string())
+    Err(format!(
+        "llama-server failed to start within 30s; see {}",
+        log_path.display()
+    ))
+}
+
+/// Start llama-server on a given port. Returns the child process.
+///
+/// Tries GPU acceleration first (`--gpu-layers 99 --flash-attn on`). If that
+/// fails (no Vulkan runtime, unsupported driver, OOM on iGPU), retries once on
+/// CPU (`--gpu-layers 0 --flash-attn off`) so machines without a usable GPU
+/// still get Smart Cleanup, just slower. Both attempts log to
+/// `<config_dir>/llm-server.log` for triage.
+pub async fn start_server(port: u16) -> Result<tokio::process::Child, String> {
+    match start_server_with(port, 99, true).await {
+        Ok(child) => Ok(child),
+        Err(gpu_err) => {
+            log::warn!("llama-server GPU mode failed: {gpu_err} — retrying on CPU");
+            match start_server_with(port, 0, false).await {
+                Ok(child) => {
+                    log::info!("llama-server fell back to CPU mode");
+                    Ok(child)
+                }
+                Err(cpu_err) => Err(format!(
+                    "Smart Cleanup failed to start. GPU: {gpu_err} | CPU: {cpu_err}"
+                )),
+            }
+        }
+    }
 }
 
 /// Stop a running llama-server process
