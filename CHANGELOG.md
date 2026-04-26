@@ -5,13 +5,14 @@ All notable changes to Chirp.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries are dated and reference the commit hash for full diff context.
 
-## [1.3.1] — 2026-04-25
+## [1.3.2] — 2026-04-25
 
-v1.3.0 was tagged but never shipped — the macOS build broke on
-sherpa-onnx-sys 1.12.36's flat-layout lookup. v1.3.1 carries the same
-app-side changes plus the CI fix.
+v1.3.0 and v1.3.1 were tagged but never shipped — v1.3.0 broke on the
+macOS build, v1.3.1 had a pending Windows-launch crash on machines
+without the VC++ Redistributable (issue #6). v1.3.2 carries all of the
+app-side changes plus both CI fixes.
 
-### 2026-04-25 — Smart Cleanup CPU fallback, Gemma 4 disk reclaim, llm-server log file, macOS CI fix
+### 2026-04-25 — Smart Cleanup CPU fallback, Gemma 4 disk reclaim, llm-server log file, macOS + Windows CI fixes
 
 #### Fixed
 - **Smart Cleanup now starts on machines without a usable GPU.**
@@ -31,6 +32,15 @@ app-side changes plus the CI fix.
   upgrading from v1.2.6 kept the old Gemma cleanup model on disk
   forever. Added it to the list; the file is now removed on first
   launch alongside the other superseded LLMs.
+- **Windows launch crash on machines without VC++ Redistributable
+  (issue #6, "Application error 0xc0000142").** The release workflow
+  was downloading the `MD-Release` build of sherpa-onnx, which links
+  against the dynamic MSVC runtime and requires the VC++
+  Redistributable to be installed. Switched to the `MT-Release`
+  variant — same library, same version, but the C/C++ runtime is
+  statically linked so the installer is fully self-contained. Fix
+  confirmed by the sherpa-onnx maintainer (csukuangfj) in the issue
+  thread.
 - **macOS release build (CI).** `sherpa-onnx-sys` 1.12.36's build
   script defaults to a flat `<manifest>/sherpa-onnx-lib` lookup and
   panics if no `.dylib`s are there; our workflow places dylibs under
