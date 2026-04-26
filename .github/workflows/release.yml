@@ -52,7 +52,7 @@ jobs:
 
       - name: Download sherpa-onnx macOS dylibs
         run: |
-          SHERPA_VERSION="1.12.29"
+          SHERPA_VERSION="1.12.36"
           ARCHIVE="sherpa-onnx-v${SHERPA_VERSION}-osx-universal2-shared.tar.bz2"
           URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/${ARCHIVE}"
 
@@ -221,7 +221,7 @@ jobs:
         # MT statically links the C/C++ runtime so the installer is
         # self-contained.
         run: |
-          SHERPA_VERSION="1.12.29"
+          SHERPA_VERSION="1.12.36"
           ARCHIVE="sherpa-onnx-v${SHERPA_VERSION}-win-x64-shared-MT-Release"
           curl -fSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/${ARCHIVE}.tar.bz2" -o sherpa.tar.bz2
           tar -xjf sherpa.tar.bz2

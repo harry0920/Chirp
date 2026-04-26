@@ -5,12 +5,13 @@ All notable changes to Chirp.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries are dated and reference the commit hash for full diff context.
 
-## [1.3.2] — 2026-04-25
+## [1.3.3] — 2026-04-25
 
-v1.3.0 and v1.3.1 were tagged but never shipped — v1.3.0 broke on the
-macOS build, v1.3.1 had a pending Windows-launch crash on machines
-without the VC++ Redistributable (issue #6). v1.3.2 carries all of the
-app-side changes plus both CI fixes.
+v1.3.0–v1.3.2 were tagged but never shipped: v1.3.0 broke on the macOS
+build, v1.3.1 had a pending Windows-launch crash, and v1.3.2's Windows
+build failed at link time on a sherpa-onnx C-lib / Rust-crate version
+mismatch. v1.3.3 carries all of the app-side changes plus all the CI
+fixes.
 
 ### 2026-04-25 — Smart Cleanup CPU fallback, Gemma 4 disk reclaim, llm-server log file, macOS + Windows CI fixes
 
@@ -48,6 +49,14 @@ app-side changes plus both CI fixes.
   Workflow now sets `SHERPA_ONNX_LIB_DIR` on the macOS build step so
   the upstream sys-crate finds them too. v1.2.x didn't hit this
   because it used the older `sherpa-onnx 0.1.10` wrapper crate.
+- **Windows link error: 13 unresolved sherpa-onnx symbols (CI).** The
+  workflow downloaded sherpa-onnx C lib v1.12.29 while our Rust crate
+  is pinned to 1.12.36; symbols added in 1.12.30+ (Online/OfflineStream
+  *Option, OnlineSpeechDenoiser*, etc.) were missing from the .lib
+  and MSVC's link-time check failed with LNK2019 × 13. macOS didn't
+  hit this because its dylibs resolve symbols lazily at load time and
+  our code never calls those new APIs. Bumped both jobs'
+  `SHERPA_VERSION` to 1.12.36 to match the Rust crate.
 
 ### 2026-04-21 — Hotkey rewrite, stuck-key fix, Qwen 3 1.7B cleanup LLM, non-English preservation
 
