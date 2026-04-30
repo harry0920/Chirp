@@ -80,8 +80,18 @@ export function HomePage() {
   }, [period, history.length])
 
   const recents = useMemo(() => {
+    // Dedupe by timestamp — when two dictations land in the same
+    // millisecond they share a React key, which causes the same row
+    // to render twice. Take the first occurrence per timestamp,
+    // then trim to the latest 3.
+    const seen = new Set<string>()
     return [...history]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .filter((e) => {
+        if (seen.has(e.timestamp)) return false
+        seen.add(e.timestamp)
+        return true
+      })
       .slice(0, 3)
   }, [history])
 

@@ -95,6 +95,7 @@ export function HeroMetric({ daily, totalWords, period, onPeriodChange }: Props)
             data={sparklineData}
             strokeWidth={1.25}
             dotRadius={2.75}
+            endRatio={2 / 3}
             className="animate-fade-in h-full w-full"
           />
         ) : (

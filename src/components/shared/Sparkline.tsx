@@ -10,6 +10,10 @@ interface SparklineProps {
   dotColor?: string
   showDot?: boolean
   padding?: number
+  /** Where the rightmost data point lands across the viewBox width.
+   *  Default 1 (right edge). Use a value <1 to leave "future" space
+   *  on the right of the chart. */
+  endRatio?: number
   className?: string
 }
 
@@ -23,6 +27,7 @@ export function Sparkline({
   dotColor = '#F0B723',
   showDot = true,
   padding = 4,
+  endRatio = 1,
   className = '',
 }: SparklineProps) {
   if (data.length === 0) {
@@ -38,7 +43,7 @@ export function Sparkline({
   }
 
   const innerH = viewHeight - padding * 2
-  const innerW = viewWidth
+  const innerW = viewWidth * endRatio
   const min = Math.min(...data)
   const max = Math.max(...data)
   const range = max - min || 1
