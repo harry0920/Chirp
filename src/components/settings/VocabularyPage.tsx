@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { trackEvent } from '@aptabase/tauri'
+import { Trash2 } from 'lucide-react'
 import { useAppStore, type VocabEntry } from '../../stores/appStore'
 import { Button } from '../shared/Button'
 
@@ -105,10 +106,10 @@ function VocabRow({ index, entry, onUpdate, onRemove }: VocabRowProps) {
       />
       <button
         onClick={() => onRemove(index)}
-        className="flex h-8 w-10 items-center justify-center text-dm-tertiary hover:text-chirp-error transition-colors duration-150 opacity-0 group-hover:opacity-100"
+        className="flex h-8 w-10 items-center justify-center rounded-md text-dm-tertiary opacity-0 transition-all duration-150 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400"
         aria-label="Remove entry"
       >
-        ✕
+        <Trash2 size={13} />
       </button>
     </div>
   )
@@ -139,12 +140,12 @@ export function VocabularyPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5 animate-slide-up">
-      <div className="mb-1">
+    <div className="flex flex-col gap-5">
+      <div className="animate-slide-up stagger-1 mb-1">
         <h1 className="font-geist font-semibold text-2xl text-dm-primary tracking-[-0.02em]">
           Vocabulary
         </h1>
-        <p className="text-[13px] text-dm-secondary mt-1">
+        <p className="font-geist text-[13px] text-dm-secondary mt-1">
           Names and terms Chirp should recognize. The first column is the canonical spelling
           (used to bias the speech model). The second column is a comma-separated list of common
           mishearings to auto-correct toward the canonical spelling.
@@ -152,14 +153,14 @@ export function VocabularyPage() {
       </div>
 
       {vocabulary.length > 0 ? (
-        <div className="overflow-hidden rounded-card border border-card-border">
+        <div className="card-surface animate-slide-up stagger-2 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center bg-card-hover px-[18px] py-2.5">
-            <span className="w-[36%] text-[11px] font-semibold uppercase tracking-[0.5px] text-dm-secondary">
+          <div className="flex items-center bg-white/[0.03] px-[18px] py-2.5">
+            <span className="w-[36%] font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
               Word / Phrase
             </span>
-            <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-dm-secondary">
-              Also correct from <span className="font-normal normal-case text-dm-tertiary">(comma-separated)</span>
+            <span className="flex-1 font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
+              Also correct from <span className="font-normal normal-case text-white/30">(comma-separated)</span>
             </span>
             <span className="w-10" />
           </div>
@@ -176,15 +177,15 @@ export function VocabularyPage() {
           ))}
         </div>
       ) : (
-        <div className="flex items-center justify-center rounded-card border border-dashed border-card-border bg-card-hover px-6 py-10">
-          <p className="text-[13px] text-dm-secondary text-center">
+        <div className="card-surface animate-slide-up stagger-2 flex items-center justify-center px-6 py-10">
+          <p className="font-geist text-[13px] text-white/45 text-center">
             No vocabulary yet. Add names, jargon, or technical terms that Chirp should recognize.
           </p>
         </div>
       )}
 
       {/* Add row */}
-      <div className="flex items-center gap-3">
+      <div className="animate-slide-up stagger-3 flex items-center gap-3">
         <input
           type="text"
           value={newTerm}
