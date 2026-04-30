@@ -7,6 +7,104 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign final polish (Phase 10)
+
+A multi-stage polish pass that landed micro-animations across every
+surface, swept the last legacy `font-display` / `font-extrabold`
+holdouts to Geist, and removed the orphaned Passive Indicator
+setting. Plan: `.claude/plans/we-are-redesigning-chirp-structured-tiger.md`.
+
+#### Cleanup (10A)
+- Geist font sweep on Vocabulary / Snippets / Pro page headers,
+  AboutModal + UpgradeModal h2s, Button primary/secondary/ghost,
+  Select trigger, TrayPopup wordmark + Today/Sessions stats. Tailwind
+  `display` / `body` / `mono` aliases retained — globals.css uses
+  `@apply font-body` and out-of-scope onboarding components still
+  reach for them; removing would break the compile.
+- TrayPopup root applies `theme-pitch` and drops the legacy
+  `darkMode` conditional class — the redesign is pitch-only.
+- Dock label `Dictionary` → `Vocabulary` so it matches the page
+  header.
+- Passive Indicator setting removed end-to-end (Phase 5 dropped the
+  rendering; the toggle did nothing). Cleared from SettingsPage row,
+  `useOverlaySync` + `useSettingsSync` synced-key arrays, `appStore`
+  shape + initializer, `constants.ts` defaults, and the
+  `src-tauri/src/state.rs` `Settings` struct + initializer. Existing
+  user `settings.json` files with `showPassiveOverlay` deserialize
+  cleanly because serde ignores unknown fields by default.
+
+#### Animation primitives (10B)
+- New keyframes in `globals.css`: `sparkline-draw-in` (uses
+  `pathLength={1}` so the dasharray draws cleanly under non-uniform
+  scaling), `sparkline-dot-in` (amber dot fades in 600ms after line
+  starts), `heatmap-cell-bloom` (per-cell opacity + scale via inline
+  `animation-delay`).
+- `Toggle` thumb already used `--spring-bounce` — verified, no change.
+
+#### Home (10C)
+- Hero number counts up from 0 on first paint (was initializing at
+  target with no animation).
+- Sparkline draws in left-to-right on mount and on every period
+  change via `key={period}` remount.
+- Period toggle gains a 1px amber sliding underline driven by refs
+  + `useLayoutEffect` + `ResizeObserver`. Underline transitions
+  left + width with the spring easing.
+- Patterns row's three cards stagger in left-to-right and now share
+  equal heights via flex stretch.
+- `WhenYouDictate` heatmap blooms diagonally — each cell delayed by
+  `(day + hour) * 6ms`, full bloom under 200ms.
+- `RecentsRow` items fade in with stagger; when a NEW dictation
+  lands, the latest row spring-pops via `animate-saved-pop`.
+- `HomePage` adds page-level stagger across hero → patterns → recents.
+- `AttentionStrip` slides in via `animate-slide-up` when items
+  appear.
+
+#### History (10D)
+- Day sections stagger in (160ms each), entries within each section
+  stagger by 40ms × index (capped at 600ms).
+- Hover on entry rows highlights with `bg-white/[0.02]`.
+- Search input gets the amber focus ring; clear-button (×) appears
+  when input has text.
+- Empty state centered around a faint BirdMark watermark.
+
+#### Vocabulary (10E)
+- Page-level stagger: header → table card → add row.
+- Table card uses `card-surface`; column header labels switched to
+  the small uppercase Geist treatment.
+- Trash icon swapped from `✕` glyph to Lucide `Trash2` with a
+  red-tinted hover background.
+
+#### Snippets (10F)
+- Page-level stagger: header → list/empty state → add card.
+- Table card uses `card-surface`; column headers normalized to Geist.
+- Empty state centers a Lucide `Zap` icon (28px, white-35%) above
+  the copy.
+- Delete buttons swapped from `✕` glyph to Lucide `Trash2`.
+
+#### Settings (10G)
+- `SectionLabel` normalized to small uppercase Geist treatment.
+- Input level visualization upgraded from a static green scalar bar
+  to a live Sparkline driven by a rolling 60-sample history buffer
+  fed by the existing `getInputLevel()` polling (~15fps).
+- Reposition button restyled to readiness-pill chrome.
+- Row hover transition smoothed from instant to 150ms ease.
+
+#### Dock (10H)
+- Inactive dock icons scale 1.0 → 1.10 on hover (200ms).
+- All dock buttons get `active:scale-95` for tactile press feedback.
+- Skipped per motion-budget cuts: infinite scale pulse on the active
+  icon, toggle-on amber thumb pulse.
+
+#### Out of scope (deferred)
+- Onboarding step components — Phase 7 chassis is acceptable; per-step
+  font sweep + step-pip morph deferred to a future phase.
+- Vocabulary inline confirm-delete morph — re-keying rows by
+  `entry.term` breaks during in-progress edits with empty terms;
+  parent-side state ownership is the right fix but is more plumbing
+  than fits this pass.
+- Snippets per-row expansion preview tooltip — inline expansion
+  already wraps and is fully visible.
+
 ### 2026-04-30 — UI redesign chassis gutter fix
 
 - Moved the page gutter wrapper (`mx-auto w-full max-w-[1080px]
