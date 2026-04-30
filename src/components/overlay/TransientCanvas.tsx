@@ -1,5 +1,3 @@
-import { BirdMark } from '../shared/BirdMark'
-
 type Mode = 'listening' | 'polishing' | 'error'
 
 interface Props {
@@ -14,10 +12,16 @@ const BAR_COUNT = 16
 const DOT_INDICES = [3, 8, 13] as const
 
 function ampForBar(amplitudes: number[], i: number): number {
-  if (amplitudes.length === 0) return 0.06
+  if (amplitudes.length === 0) return 0.04
   const srcIdx = Math.round((i / (BAR_COUNT - 1)) * (amplitudes.length - 1))
-  return amplitudes[srcIdx] ?? 0.06
+  return amplitudes[srcIdx] ?? 0.04
 }
+
+// Listening = snappy follow-the-amplitude (60ms) so the waveform feels
+// alive, not lagged. Morph = the full liquid transition into dots.
+const LISTENING_TRANSITION = 'height 60ms linear'
+const MORPH_TRANSITION =
+  'height 420ms cubic-bezier(0.65, 0, 0.35, 1), width 420ms cubic-bezier(0.65, 0, 0.35, 1), opacity 280ms ease-out'
 
 export function TransientCanvas({ mode, amplitudes, dismissing }: Props) {
   const isListening = mode === 'listening'
@@ -25,18 +29,21 @@ export function TransientCanvas({ mode, amplitudes, dismissing }: Props) {
 
   return (
     <div
-      className={`flex h-9 items-center gap-2.5 rounded-full border border-white/10 bg-black/70 px-4 backdrop-blur-xl transition-opacity duration-200 ${
+      className={`flex h-9 items-center rounded-full border border-white/10 bg-black/70 px-4 backdrop-blur-xl transition-opacity duration-200 ${
         dismissing ? 'opacity-0' : 'opacity-100'
       }`}
       style={{ boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04)' }}
     >
-      <BirdMark size={14} color="#FFFFFF" />
       <div className="flex h-6 items-center gap-[1.5px]">
         {Array.from({ length: BAR_COUNT }).map((_, i) => {
           const dotIdx = DOT_INDICES.indexOf(i as typeof DOT_INDICES[number])
           const isDotPosition = dotIdx >= 0
 
-          const liveHeight = Math.max(3, Math.sqrt(ampForBar(amplitudes, i)) * 22)
+          // Steeper response curve (^0.45 instead of sqrt) so quiet
+          // speech still produces visible movement and louder peaks
+          // hit ceiling fast — the waveform reads more responsive.
+          const amp = ampForBar(amplitudes, i)
+          const liveHeight = Math.max(3, Math.pow(amp, 0.45) * 24)
 
           // Listening: bars driven by amplitudes.
           // Polishing/error: 3 dots remain (rounded square 4×4), others collapse.
@@ -54,8 +61,7 @@ export function TransientCanvas({ mode, amplitudes, dismissing }: Props) {
                 opacity,
                 backgroundColor: color,
                 borderRadius: 9999,
-                transition:
-                  'height 420ms cubic-bezier(0.65, 0, 0.35, 1), width 420ms cubic-bezier(0.65, 0, 0.35, 1), opacity 280ms ease-out',
+                transition: isListening ? LISTENING_TRANSITION : MORPH_TRANSITION,
                 animation:
                   !isListening && isDotPosition
                     ? 'overlay-dot-pulse 900ms ease-in-out infinite'
