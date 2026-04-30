@@ -89,7 +89,7 @@ export function AboutModal() {
         <div className="flex flex-col items-center">
           <BirdMark size={64} />
 
-          <h2 className="mt-3 font-display font-extrabold text-[28px] text-dm-primary">
+          <h2 className="mt-3 font-geist font-semibold text-[28px] tracking-[-0.02em] text-dm-primary">
             chirp
           </h2>
 

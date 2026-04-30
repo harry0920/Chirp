@@ -2,23 +2,44 @@ import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { useAppStore } from '../../stores/appStore'
-import type { HotkeyMode } from '../../stores/appStore'
+import type { CleanupProvider, HotkeyMode } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import { useHotkeyRecorder } from '../../hooks/useHotkeyRecorder'
 import type { AudioDevice } from '../../hooks/useTauri'
 import { useCleanupToggle } from '../../hooks/useCleanupToggle'
 import { useLlmDownloaded } from '../../hooks/useLlmDownloaded'
-import { TONE_MODES, STT_MODELS, LLM_MODEL } from '../../lib/constants'
+import { TONE_MODES, STT_MODELS, LLM_MODEL, CLEANUP_PROVIDERS } from '../../lib/constants'
 import { formatHotkey } from '../../lib/utils'
 import { Toggle } from '../shared/Toggle'
 import { Select } from '../shared/Select'
 import { KeyBadge } from '../shared/KeyBadge'
 import { Button } from '../shared/Button'
+import { CleanupStatusBadge } from '../CleanupStatusBadge'
 
 const HOTKEY_MODE_OPTIONS: Array<{ id: HotkeyMode; label: string }> = [
   { id: 'hold', label: 'Hold' },
   { id: 'tap', label: 'Tap' },
 ]
+
+type CloudProvider = Exclude<CleanupProvider, 'local'>
+
+const CLOUD_PROVIDER_LABEL: Record<CloudProvider, string> = {
+  openai_compatible: 'OpenAI-compatible',
+  anthropic: 'Anthropic',
+  gemini: 'Google',
+}
+
+const CLOUD_PROVIDER_PLACEHOLDER: Record<CloudProvider, string> = {
+  openai_compatible: 'sk-...',
+  anthropic: 'sk-ant-...',
+  gemini: 'AIza...',
+}
+
+const CLOUD_PROVIDER_MODEL_PLACEHOLDER: Record<CloudProvider, string> = {
+  openai_compatible: 'gpt-4.1-mini',
+  anthropic: 'claude-haiku-4-5',
+  gemini: 'gemini-2.5-flash',
+}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -155,6 +176,22 @@ export function SettingsPage() {
   const currentModel = STT_MODELS.find((m) => m.id === store.model)
   const isDownloaded = store.modelDownloaded[store.model]
   const currentHotkeyLabels = formatHotkey(store.hotkey)
+  const usingCloudCleanup = store.cleanupProvider !== 'local'
+  const activeCloudProvider = usingCloudCleanup
+    ? (store.cleanupProvider as CloudProvider)
+    : null
+  const activeCloudConfig = activeCloudProvider
+    ? store.cleanupProviderConfigs[activeCloudProvider]
+    : null
+  const cleanupDescription = usingCloudCleanup
+    ? `Polish grammar via ${CLOUD_PROVIDER_LABEL[activeCloudProvider as CloudProvider]}`
+    : 'Polish grammar and filler words with local AI'
+
+  // Local-state mirror of the API key for the current provider. We never
+  // store the key value in the Zustand store — it lives in the OS keychain
+  // and is fetched on demand, so closing the settings window forgets it
+  // from memory.
+  const [apiKeyDraft, setApiKeyDraft] = useState('')
 
   // Load audio devices
   useEffect(() => {
@@ -182,6 +219,93 @@ export function SettingsPage() {
     }).catch((e) => {
       if (import.meta.env.DEV) console.error('Failed to sync hotkey mode:', e)
     })
+  }
+
+  const handleCleanupProviderChange = async (provider: CleanupProvider) => {
+    if (provider === store.cleanupProvider) return
+    store.updateSettings({ cleanupProvider: provider })
+    store.updateSettings({ cleanupTestStatus: { state: 'idle' } })
+
+    if (provider !== 'local' && store.llmReady) {
+      try {
+        await tauri.stopLlm()
+        store.setLlmReady(false)
+      } catch (e) {
+        if (import.meta.env.DEV) console.error('Failed to stop LLM after provider change:', e)
+      }
+    } else if (provider === 'local' && store.aiCleanup && llmDownloaded && !store.llmReady) {
+      try {
+        await tauri.startLlm()
+        store.setLlmReady(true)
+      } catch (e) {
+        if (import.meta.env.DEV) console.error('Failed to start LLM after provider change:', e)
+      }
+    }
+  }
+
+  // When the active provider changes (or on first mount of this section),
+  // fetch the saved key so the input field reflects what's stored. Only
+  // queries the keychain — does NOT broadcast the value anywhere.
+  useEffect(() => {
+    if (!activeCloudProvider) {
+      setApiKeyDraft('')
+      return
+    }
+    let cancelled = false
+    invoke<string>('get_cleanup_api_key', { provider: activeCloudProvider })
+      .then((key) => {
+        if (cancelled) return
+        setApiKeyDraft(key)
+        const hasKey = key.trim().length > 0
+        const next = { ...store.cleanupHasKey, [activeCloudProvider]: hasKey }
+        store.updateSettings({ cleanupHasKey: next })
+      })
+      .catch((e) => {
+        if (import.meta.env.DEV) console.error('Failed to read API key:', e)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeCloudProvider]) // eslint-disable-line react-hooks/exhaustive-deps -- store ref is stable
+
+  const handleApiKeyCommit = async () => {
+    if (!activeCloudProvider) return
+    const trimmed = apiKeyDraft.trim()
+    try {
+      await invoke('set_cleanup_api_key', { provider: activeCloudProvider, key: trimmed })
+      const next = { ...store.cleanupHasKey, [activeCloudProvider]: trimmed.length > 0 }
+      store.updateSettings({ cleanupHasKey: next })
+      store.updateSettings({ cleanupTestStatus: { state: 'idle' } })
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('Failed to save API key:', e)
+    }
+  }
+
+  const handleProviderConfigChange = (
+    provider: CloudProvider,
+    patch: { model?: string; baseUrl?: string },
+  ) => {
+    const current = store.cleanupProviderConfigs[provider] ?? { model: '' }
+    const next = { ...store.cleanupProviderConfigs, [provider]: { ...current, ...patch } }
+    store.updateSettings({ cleanupProviderConfigs: next })
+    store.updateSettings({ cleanupTestStatus: { state: 'idle' } })
+  }
+
+  const handleTestConnection = async () => {
+    store.updateSettings({ cleanupTestStatus: { state: 'testing' } })
+    try {
+      const cleaned = await invoke<string>('test_cleanup_connection')
+      store.updateSettings({
+        cleanupTestStatus: {
+          state: 'ok',
+          message: cleaned.trim().slice(0, 120),
+        },
+      })
+    } catch (e) {
+      store.updateSettings({
+        cleanupTestStatus: { state: 'error', message: String(e) },
+      })
+    }
   }
 
   const handleCaptureKey = () => {
@@ -568,28 +692,9 @@ export function SettingsPage() {
             <div>
               <div className="flex items-center gap-2">
                 <div className="text-[13px] font-medium text-dm-primary">Smart Cleanup</div>
-                {store.aiCleanup && (
-                  <span className="flex items-center gap-1">
-                    {cleanupStarting ? (
-                      <>
-                        <div className="h-1.5 w-1.5 rounded-full bg-chirp-amber-400 animate-pulse" />
-                        <span className="text-[11px] text-dm-secondary">Getting ready...</span>
-                      </>
-                    ) : store.llmReady ? (
-                      <>
-                        <div className="h-1.5 w-1.5 rounded-full bg-chirp-success" />
-                        <span className="text-[11px] text-dm-secondary">Active</span>
-                      </>
-                    ) : !llmDownloaded ? (
-                      <>
-                        <div className="h-1.5 w-1.5 rounded-full bg-chirp-amber-400" />
-                        <span className="text-[11px] text-chirp-amber-500">Model needed</span>
-                      </>
-                    ) : null}
-                  </span>
-                )}
+                <CleanupStatusBadge cleanupStarting={cleanupStarting} />
               </div>
-              <div className="text-[11px] text-dm-secondary mt-0.5">Polish grammar and filler words with local AI</div>
+              <div className="text-[11px] text-dm-secondary mt-0.5">{cleanupDescription}</div>
             </div>
             <Toggle
               checked={store.aiCleanup}
@@ -599,21 +704,135 @@ export function SettingsPage() {
           </Row>
 
           {store.aiCleanup && (
-            <Row>
-              <div>
-                <div className="text-[13px] font-medium text-dm-primary">Tone</div>
-                <div className="text-[11px] text-dm-secondary mt-0.5">
-                  {TONE_MODES.find(m => m.id === store.toneMode)?.description}
+            <>
+              <Row>
+                <div>
+                  <div className="text-[13px] font-medium text-dm-primary">Run cleanup on</div>
+                  <div className="text-[11px] text-dm-secondary mt-0.5">
+                    {usingCloudCleanup
+                      ? `Sends transcript text to ${CLOUD_PROVIDER_LABEL[activeCloudProvider as CloudProvider]}`
+                      : 'Runs cleanup on this device'}
+                  </div>
                 </div>
-              </div>
-              <div className="w-[180px]">
-                <Select
-                  options={TONE_MODES.map(m => ({ value: m.id, label: m.label }))}
-                  value={store.toneMode}
-                  onChange={(v) => store.updateSettings({ toneMode: String(v) })}
-                />
-              </div>
-            </Row>
+                <div className="w-[220px]">
+                  <Select
+                    options={CLEANUP_PROVIDERS.map(p => ({ value: p.id, label: p.label }))}
+                    value={store.cleanupProvider}
+                    onChange={(v) => handleCleanupProviderChange(v as CleanupProvider)}
+                  />
+                </div>
+              </Row>
+
+              {usingCloudCleanup && activeCloudProvider && activeCloudConfig && (
+                <>
+                  <div className="px-[18px] py-[10px] border-b border-dm-row-sep bg-card-hover/50">
+                    <div className="text-[11px] text-dm-secondary leading-relaxed">
+                      Transcripts will be sent to {CLOUD_PROVIDER_LABEL[activeCloudProvider]} under their privacy policy. Your API key stays in this device's keychain.
+                    </div>
+                  </div>
+
+                  <Row>
+                    <div>
+                      <div className="text-[13px] font-medium text-dm-primary">API key</div>
+                      <div className="text-[11px] text-dm-secondary mt-0.5">
+                        {store.cleanupHasKey[activeCloudProvider] ? 'Saved in your OS keychain' : 'No key saved yet'}
+                      </div>
+                    </div>
+                    <input
+                      type="password"
+                      value={apiKeyDraft}
+                      onChange={(e) => setApiKeyDraft(e.target.value)}
+                      onBlur={handleApiKeyCommit}
+                      placeholder={CLOUD_PROVIDER_PLACEHOLDER[activeCloudProvider]}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="ml-4 h-10 w-[260px] rounded-lg border border-card-border bg-dm-input px-3 font-body text-sm text-dm-primary placeholder:text-dm-secondary focus:border-chirp-yellow focus:border-2 focus:outline-none"
+                    />
+                  </Row>
+
+                  <Row>
+                    <div>
+                      <div className="text-[13px] font-medium text-dm-primary">Model</div>
+                      <div className="text-[11px] text-dm-secondary mt-0.5">Cheap + fast models work best for cleanup</div>
+                    </div>
+                    <input
+                      type="text"
+                      value={activeCloudConfig.model}
+                      onChange={(e) =>
+                        handleProviderConfigChange(activeCloudProvider, { model: e.target.value })
+                      }
+                      placeholder={CLOUD_PROVIDER_MODEL_PLACEHOLDER[activeCloudProvider]}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="ml-4 h-10 w-[220px] rounded-lg border border-card-border bg-dm-input px-3 font-body text-sm text-dm-primary placeholder:text-dm-secondary focus:border-chirp-yellow focus:border-2 focus:outline-none"
+                    />
+                  </Row>
+
+                  {activeCloudProvider === 'openai_compatible' && (
+                    <Row>
+                      <div>
+                        <div className="text-[13px] font-medium text-dm-primary">Base URL</div>
+                        <div className="text-[11px] text-dm-secondary mt-0.5">
+                          Defaults to OpenAI. Point at Groq, OpenRouter, Ollama, etc.
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={activeCloudConfig.baseUrl ?? ''}
+                        onChange={(e) =>
+                          handleProviderConfigChange(activeCloudProvider, { baseUrl: e.target.value })
+                        }
+                        placeholder="https://api.openai.com/v1"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="ml-4 h-10 w-[280px] rounded-lg border border-card-border bg-dm-input px-3 font-body text-sm text-dm-primary placeholder:text-dm-secondary focus:border-chirp-yellow focus:border-2 focus:outline-none"
+                      />
+                    </Row>
+                  )}
+
+                  <Row>
+                    <div>
+                      <div className="text-[13px] font-medium text-dm-primary">Test connection</div>
+                      <div className="text-[11px] text-dm-secondary mt-0.5">
+                        {store.cleanupTestStatus.state === 'ok' && (
+                          <span className="text-chirp-success">Connected · "{store.cleanupTestStatus.message}"</span>
+                        )}
+                        {store.cleanupTestStatus.state === 'error' && (
+                          <span className="text-chirp-amber-500">{store.cleanupTestStatus.message}</span>
+                        )}
+                        {store.cleanupTestStatus.state === 'testing' && 'Sending a small test prompt...'}
+                        {store.cleanupTestStatus.state === 'idle' && 'Verify your key + model are working'}
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleTestConnection}
+                      disabled={
+                        store.cleanupTestStatus.state === 'testing' ||
+                        !store.cleanupHasKey[activeCloudProvider]
+                      }
+                    >
+                      {store.cleanupTestStatus.state === 'testing' ? 'Testing...' : 'Test'}
+                    </Button>
+                  </Row>
+                </>
+              )}
+
+              <Row>
+                <div>
+                  <div className="text-[13px] font-medium text-dm-primary">Tone</div>
+                  <div className="text-[11px] text-dm-secondary mt-0.5">
+                    {TONE_MODES.find(m => m.id === store.toneMode)?.description}
+                  </div>
+                </div>
+                <div className="w-[180px]">
+                  <Select
+                    options={TONE_MODES.map(m => ({ value: m.id, label: m.label }))}
+                    value={store.toneMode}
+                    onChange={(v) => store.updateSettings({ toneMode: String(v) })}
+                  />
+                </div>
+              </Row>
+            </>
           )}
 
           <Row last>
@@ -661,16 +880,6 @@ export function SettingsPage() {
             <Toggle
               checked={store.playSoundOnComplete}
               onChange={(v) => store.updateSettings({ playSoundOnComplete: v })}
-            />
-          </Row>
-          <Row>
-            <div>
-              <div className="text-[13px] font-medium text-dm-primary">Passive indicator</div>
-              <div className="text-[11px] text-dm-secondary mt-0.5">Small icon on screen when Chirp is ready</div>
-            </div>
-            <Toggle
-              checked={store.showPassiveOverlay}
-              onChange={(v) => store.updateSettings({ showPassiveOverlay: v })}
             />
           </Row>
           <Row>

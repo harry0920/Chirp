@@ -10,14 +10,28 @@ export const DEFAULT_SETTINGS = {
   onboardingComplete: false,
   aiCleanup: true,
   overlayPosition: 'default' as string | { x: number; y: number },
-  showPassiveOverlay: true,
   toneMode: 'message',
   historyRetentionDays: 0,
   helpImprove: false,
   beamSearch: false,
   cleanupModel: 'chirp-v2' as string,
+  cleanupProvider: 'local' as 'local' | 'openai_compatible' | 'anthropic' | 'gemini',
+  cleanupProviderConfigs: {
+    openai_compatible: { model: 'gpt-4.1-mini', baseUrl: 'https://api.openai.com/v1' },
+    anthropic: { model: 'claude-haiku-4-5' },
+    gemini: { model: 'gemini-2.5-flash' },
+  } as Record<'openai_compatible' | 'anthropic' | 'gemini', { model: string; baseUrl?: string }>,
   darkMode: false,
 }
+
+export const CLEANUP_PROVIDERS = [
+  { id: 'local', label: 'Local', description: 'Runs entirely on this device' },
+  { id: 'openai_compatible', label: 'OpenAI-compatible', description: 'OpenAI, Groq, OpenRouter, Together, Ollama, etc.' },
+  { id: 'anthropic', label: 'Anthropic (Claude)', description: 'Cloud cleanup via Anthropic\'s API' },
+  { id: 'gemini', label: 'Google Gemini', description: 'Cloud cleanup via Google AI Studio' },
+] as const
+
+export type CleanupProviderId = typeof CLEANUP_PROVIDERS[number]['id']
 
 export const TONE_MODES = [
   { id: 'message', label: 'Message', description: 'Natural conversational tone' },

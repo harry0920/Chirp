@@ -3,12 +3,16 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useAppStore } from '../stores/appStore'
 
+// The overlay window only needs to know which provider is active to label the
+// status badge. Per-provider configs and API keys never leave the settings
+// window.
 const SYNCED_KEYS = [
   'hotkey', 'hotkeyMode', 'launchAtLogin', 'playSoundOnComplete',
   'autoDismissOverlay', 'smartFormatting',
   'inputDevice', 'model', 'onboardingComplete',
-  'aiCleanup', 'cleanupModel', 'beamSearch', 'toneMode',
-  'overlayPosition', 'showPassiveOverlay',
+  'aiCleanup', 'cleanupModel', 'cleanupProvider',
+  'beamSearch', 'toneMode',
+  'overlayPosition',
   'historyRetentionDays', 'helpImprove', 'darkMode',
 ] as const
 

@@ -10,6 +10,7 @@ import { formatHotkey, formatRelativeTime } from '../../lib/utils'
 import { BirdMark } from '../shared/BirdMark'
 import { Toggle } from '../shared/Toggle'
 import { KeyBadge } from '../shared/KeyBadge'
+import { useCleanupStatusText } from '../../hooks/useCleanupStatusText'
 
 export function TrayPopup() {
   useOverlaySync()
@@ -49,10 +50,8 @@ export function TrayPopup() {
     return () => { unlisten.then((f) => f()) }
   }, [])
 
-  const darkMode = useAppStore((s) => s.darkMode)
   const hotkey = useAppStore((s) => s.hotkey)
   const aiCleanup = useAppStore((s) => s.aiCleanup)
-  const llmReady = useAppStore((s) => s.llmReady)
   const hotkeyStatus = useAppStore((s) => s.hotkeyStatus)
   const history = useAppStore((s) => s.history)
   const modelDownloaded = useAppStore((s) => s.modelDownloaded)
@@ -63,6 +62,7 @@ export function TrayPopup() {
 
   const hotkeyLabels = formatHotkey(hotkey)
   const isModelReady = modelDownloaded['parakeet-tdt-0.6b']
+  const cleanupStatus = useCleanupStatusText(cleanupStarting)
 
   // Today stats
   const today = new Date().toDateString()
@@ -111,13 +111,13 @@ export function TrayPopup() {
   if (!settingsLoaded) return null
 
   return (
-    <div className={`h-full w-full bg-card overflow-hidden ${darkMode ? 'dark' : ''}`}>
+    <div className="theme-pitch h-full w-full bg-card overflow-hidden font-geist">
       <div className="animate-popup-in">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2.5">
             <BirdMark size={24} />
-            <span className="font-display font-[800] text-[17px] text-dm-primary tracking-[-0.3px]">
+            <span className="font-geist font-semibold text-[17px] text-dm-primary tracking-[-0.02em]">
               chirp
             </span>
           </div>
@@ -150,13 +150,7 @@ export function TrayPopup() {
           <div>
             <div className="text-[13px] font-medium text-dm-primary">Smart Cleanup</div>
             <div className="text-[11px] text-dm-secondary mt-0.5">
-              {aiCleanup
-                ? cleanupStarting
-                  ? 'Starting...'
-                  : llmReady
-                    ? 'Active'
-                    : 'Model needed'
-                : 'Off'}
+              {cleanupStatus}
             </div>
           </div>
           <Toggle
@@ -195,14 +189,14 @@ export function TrayPopup() {
         <div className="flex border-t border-card-border">
           <div className="flex-1 px-5 py-3 border-r border-card-border">
             <div className="text-[11px] text-dm-muted font-medium uppercase tracking-wide mb-0.5">Today</div>
-            <div className="font-display font-[800] text-[22px] text-dm-primary leading-none">
+            <div className="font-geist font-semibold text-[22px] tracking-[-0.02em] text-dm-primary leading-none">
               {todayWords.toLocaleString()}
             </div>
             <div className="text-[11px] text-dm-secondary mt-0.5">words</div>
           </div>
           <div className="flex-1 px-5 py-3">
             <div className="text-[11px] text-dm-muted font-medium uppercase tracking-wide mb-0.5">Sessions</div>
-            <div className="font-display font-[800] text-[22px] text-dm-primary leading-none">
+            <div className="font-geist font-semibold text-[22px] tracking-[-0.02em] text-dm-primary leading-none">
               {todaySessions}
             </div>
             <div className="text-[11px] text-dm-secondary mt-0.5">today</div>

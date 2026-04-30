@@ -65,8 +65,6 @@ pub struct Settings {
     pub ai_cleanup: bool,
     #[serde(default = "default_overlay_position")]
     pub overlay_position: serde_json::Value,
-    #[serde(default = "default_true")]
-    pub show_passive_overlay: bool,
     #[serde(default = "default_tone_mode")]
     pub tone_mode: String,
     #[serde(default)]
@@ -139,10 +137,6 @@ fn default_overlay_position() -> serde_json::Value {
     serde_json::Value::String("bottom".into())
 }
 
-fn default_true() -> bool {
-    true
-}
-
 fn default_tone_mode() -> String {
     "message".into()
 }
@@ -161,7 +155,6 @@ impl Default for Settings {
             onboarding_complete: false,
             ai_cleanup: true,
             overlay_position: serde_json::Value::String("bottom".into()),
-            show_passive_overlay: true,
             tone_mode: "message".into(),
             history_retention_days: 0,
             help_improve: false,

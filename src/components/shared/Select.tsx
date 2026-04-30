@@ -58,7 +58,7 @@ export function Select({ options, value, onChange, placeholder }: SelectProps) {
       <button
         ref={buttonRef}
         onClick={() => setOpen(!open)}
-        className="flex h-10 w-full items-center justify-between rounded-lg border border-card-border bg-dm-input px-3 font-body text-sm text-dm-primary transition-colors duration-150 ease-out hover:border-card-border focus:border-chirp-yellow focus:border-2 focus:outline-none"
+        className="flex h-10 w-full items-center justify-between rounded-lg border border-card-border bg-dm-input px-3 font-geist text-sm text-dm-primary transition-colors duration-150 ease-out hover:border-card-border focus:border-chirp-yellow focus:border-2 focus:outline-none"
       >
         <span className={selected ? '' : 'text-dm-secondary italic'}>
           {selected?.label ?? placeholder ?? 'Select...'}

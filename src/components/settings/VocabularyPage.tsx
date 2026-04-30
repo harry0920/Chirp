@@ -141,7 +141,7 @@ export function VocabularyPage() {
   return (
     <div className="flex flex-col gap-5 animate-slide-up">
       <div className="mb-1">
-        <h1 className="font-display font-extrabold text-2xl text-dm-primary tracking-[-0.5px]">
+        <h1 className="font-geist font-semibold text-2xl text-dm-primary tracking-[-0.02em]">
           Vocabulary
         </h1>
         <p className="text-[13px] text-dm-secondary mt-1">

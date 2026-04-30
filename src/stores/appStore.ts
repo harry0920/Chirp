@@ -105,7 +105,6 @@ export interface AppState {
 
   // Overlay
   overlayPosition: string | { x: number; y: number }
-  showPassiveOverlay: boolean
   repositionMode: boolean
 
   // History retention
@@ -225,7 +224,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   // Overlay
   overlayPosition: DEFAULT_SETTINGS.overlayPosition,
-  showPassiveOverlay: DEFAULT_SETTINGS.showPassiveOverlay,
   repositionMode: false,
 
   // History retention

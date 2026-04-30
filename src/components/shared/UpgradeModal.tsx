@@ -65,12 +65,12 @@ export function UpgradeModal() {
 
           <div className="mt-5 flex items-center gap-2">
             <Sparkles size={14} className="text-chirp-amber-500" />
-            <span className="font-display font-extrabold text-[11px] tracking-widest uppercase text-chirp-amber-500">
+            <span className="font-geist font-semibold text-[11px] tracking-widest uppercase text-chirp-amber-500">
               New in Chirp
             </span>
           </div>
 
-          <h2 className="mt-3 font-display font-extrabold text-[24px] text-dm-primary leading-tight text-center px-8">
+          <h2 className="mt-3 font-geist font-semibold text-[24px] tracking-[-0.02em] text-dm-primary leading-tight text-center px-8">
             Enable
             <br />
             Smart Cleanup

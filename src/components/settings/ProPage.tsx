@@ -105,7 +105,7 @@ export function ProPage() {
       <section className="animate-slide-up rounded-card border border-card-border bg-card px-6 py-5">
         <div className="flex items-start justify-between gap-6">
           <div className="min-w-0">
-            <h1 className="font-display text-[28px] font-black leading-tight text-dm-primary">
+            <h1 className="font-geist text-[28px] font-semibold leading-tight tracking-[-0.02em] text-dm-primary">
               Help shape Chirp Pro
             </h1>
             <p className="mt-2 max-w-[680px] text-[14px] leading-relaxed text-dm-secondary">

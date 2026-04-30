@@ -10,11 +10,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-dm-btn-bg text-dm-btn-text font-display font-bold text-sm hover:bg-dm-btn-hover active:bg-[#000] disabled:bg-dm-btn-disabled-bg disabled:text-dm-btn-disabled-text disabled:cursor-not-allowed',
+    'bg-dm-btn-bg text-dm-btn-text font-geist font-medium text-sm hover:bg-dm-btn-hover active:bg-[#000] disabled:bg-dm-btn-disabled-bg disabled:text-dm-btn-disabled-text disabled:cursor-not-allowed',
   secondary:
-    'bg-card border border-card-border text-dm-primary font-body font-medium text-sm hover:bg-card-hover active:bg-card-hover',
+    'bg-card border border-card-border text-dm-primary font-geist font-medium text-sm hover:bg-card-hover active:bg-card-hover',
   ghost:
-    'bg-transparent text-dm-secondary font-body font-medium text-[13px] hover:text-dm-primary',
+    'bg-transparent text-dm-secondary font-geist font-medium text-[13px] hover:text-dm-primary',
   icon:
     'w-8 h-8 bg-transparent hover:bg-card-hover flex items-center justify-center text-dm-secondary hover:text-dm-primary',
 }
