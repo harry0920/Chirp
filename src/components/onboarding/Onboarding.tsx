@@ -24,47 +24,38 @@ export function Onboarding() {
   const helpStep = IS_MAC ? 4 : 3
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Left branded panel */}
-      <div className="w-[40%] bg-sidebar flex flex-col items-center justify-center relative overflow-hidden">
-        <div className="absolute w-72 h-72 rounded-full blur-3xl opacity-20 bg-gradient-to-br from-chirp-yellow via-chirp-amber-400 to-chirp-amber-600 animate-float-1" />
-
-        <div className="relative">
-          <div className="absolute inset-0 w-[120px] h-[120px] rounded-full blur-2xl opacity-40 bg-chirp-yellow" />
-          <BirdMark size={120} className="relative" />
+    <div className="theme-pitch flex h-screen flex-col overflow-hidden bg-black font-geist text-white">
+      <div className="mx-auto flex w-full max-w-[640px] flex-1 flex-col items-center justify-center px-12">
+        <div className="halo-mark relative mb-3 flex items-center justify-center">
+          <BirdMark size={56} color="#FFFFFF" />
         </div>
-
-        <span className="font-display font-black text-4xl text-white mt-4 relative">
+        <h1 className="font-geist text-[26px] font-semibold tracking-tight text-white">
           chirp
-        </span>
-        <span className="font-body text-lg text-white/40 mt-2 relative">
-          Speak freely.
-        </span>
+        </h1>
 
-        <div className="flex gap-2 mt-12 relative">
-          {Array.from({ length: STEPS }, (_, i) => (
-            <div
-              key={i}
-              className={`rounded-full transition-all duration-300 ease-out h-2 ${
-                i === step
-                  ? 'w-8 bg-chirp-yellow'
-                  : i < step
-                    ? 'w-2 bg-chirp-yellow/50'
-                    : 'w-2 bg-white/20'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Right content panel */}
-      <div className="w-[60%] bg-surface flex items-center justify-center px-16 overflow-hidden">
-        <div className="max-w-[480px] w-full">
+        <div className="mt-12 w-full">
           {step === 0 && <Welcome onNext={() => setStep(1)} />}
           {step === 1 && <SetupStep onNext={() => setStep(2)} />}
           {IS_MAC && step === 2 && <PermissionsStep onNext={() => setStep(3)} />}
           {step === modelStep && <ModelDownload onFinish={() => setStep(helpStep)} />}
           {step === helpStep && <HelpImprove onNext={handleFinish} />}
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-center pb-10">
+        <div className="flex items-center gap-2">
+          {Array.from({ length: STEPS }, (_, i) => (
+            <span
+              key={i}
+              className={`block h-1 rounded-full transition-all duration-300 ${
+                i === step
+                  ? 'w-6 bg-white'
+                  : i < step
+                    ? 'w-1 bg-white/55'
+                    : 'w-1 bg-white/15'
+              }`}
+            />
+          ))}
         </div>
       </div>
     </div>

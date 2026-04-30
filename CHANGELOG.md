@@ -7,6 +7,22 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign onboarding chassis (Phase 7)
+
+#### Changed
+- Rewrote `src/components/onboarding/Onboarding.tsx` chassis as a
+  full-bleed black panel with the BirdMark + `chirp` wordmark anchored
+  in the upper third (white BirdMark with `.halo-mark`, Geist 600
+  wordmark) and the active step component centered below. Step pips
+  at the bottom in white (active wide pill, completed small dot,
+  upcoming faint).
+- Drops the previous two-panel split (dark left + warm cream right),
+  the floating amber gradient blob, and the "Speak freely." marketing
+  tagline. Onboarding inherits the `theme-pitch` palette so the child
+  step components (Welcome, SetupStep, PermissionsStep, ModelDownload,
+  HelpImprove) read coherently on the new black canvas without
+  per-step rewrites.
+
 ### 2026-04-30 — UI redesign History page + theme-pitch palette (Phase 6)
 
 #### Added
