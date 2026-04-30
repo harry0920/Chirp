@@ -1,7 +1,9 @@
 interface SparklineProps {
   data: number[]
-  width?: number
-  height?: number
+  /** SVG viewBox aspect — the rendered SVG fills its parent regardless,
+   *  this just controls the drawing coordinate system. */
+  viewWidth?: number
+  viewHeight?: number
   strokeWidth?: number
   dotRadius?: number
   lineColor?: string
@@ -13,8 +15,8 @@ interface SparklineProps {
 
 export function Sparkline({
   data,
-  width = 200,
-  height = 40,
+  viewWidth = 1000,
+  viewHeight = 100,
   strokeWidth = 1.25,
   dotRadius = 2.5,
   lineColor = '#FFFFFF',
@@ -26,17 +28,17 @@ export function Sparkline({
   if (data.length === 0) {
     return (
       <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
+        viewBox={`0 0 ${viewWidth} ${viewHeight}`}
+        preserveAspectRatio="none"
         className={className}
+        style={{ width: '100%', height: '100%' }}
         xmlns="http://www.w3.org/2000/svg"
       />
     )
   }
 
-  const innerH = height - padding * 2
-  const innerW = width
+  const innerH = viewHeight - padding * 2
+  const innerW = viewWidth
   const min = Math.min(...data)
   const max = Math.max(...data)
   const range = max - min || 1
@@ -53,10 +55,10 @@ export function Sparkline({
 
   return (
     <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
+      viewBox={`0 0 ${viewWidth} ${viewHeight}`}
+      preserveAspectRatio="none"
       className={className}
+      style={{ width: '100%', height: '100%', overflow: 'visible' }}
       xmlns="http://www.w3.org/2000/svg"
       shapeRendering="geometricPrecision"
     >
@@ -68,6 +70,7 @@ export function Sparkline({
           strokeWidth={strokeWidth}
           strokeLinejoin="miter"
           strokeLinecap="butt"
+          vectorEffect="non-scaling-stroke"
         />
       )}
       {showDot && (
@@ -76,6 +79,7 @@ export function Sparkline({
           cy={last[1]}
           r={dotRadius}
           fill={dotColor}
+          vectorEffect="non-scaling-stroke"
         />
       )}
     </svg>
