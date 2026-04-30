@@ -32,7 +32,7 @@ export function TransientCanvas({ mode, amplitudes, dismissing }: Props) {
       className={`flex items-center rounded-full border border-white/10 bg-black/70 px-4 py-2.5 backdrop-blur-xl transition-opacity duration-200 ${
         dismissing ? 'opacity-0' : 'opacity-100'
       }`}
-      style={{ boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04)' }}
+      style={{ boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)' }}
     >
       <div className="flex h-6 items-center gap-[5px]">
         {Array.from({ length: BAR_COUNT }).map((_, i) => {
