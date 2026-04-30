@@ -17,9 +17,11 @@ function ampForBar(amplitudes: number[], i: number): number {
   return amplitudes[srcIdx] ?? 0.04
 }
 
-// Listening = snappy follow-the-amplitude (60ms) so the waveform feels
-// alive, not lagged. Morph = the full liquid transition into dots.
-const LISTENING_TRANSITION = 'height 60ms linear'
+// Listening = follow the voice envelope, not every micro-spike. 90ms
+// ease-out interpolates between amplitude frames so the bars track the
+// envelope instead of jittering on every tick. Morph = the full liquid
+// transition into dots.
+const LISTENING_TRANSITION = 'height 90ms ease-out'
 const MORPH_TRANSITION =
   'height 420ms cubic-bezier(0.65, 0, 0.35, 1), width 420ms cubic-bezier(0.65, 0, 0.35, 1), opacity 280ms ease-out'
 
@@ -29,21 +31,23 @@ export function TransientCanvas({ mode, amplitudes, dismissing }: Props) {
 
   return (
     <div
-      className={`flex items-center rounded-full border border-white/10 bg-black/70 px-4 py-2.5 backdrop-blur-xl transition-opacity duration-200 ${
+      className={`flex items-center rounded-full border border-white/10 bg-black/70 px-5 py-3 backdrop-blur-xl transition-opacity duration-200 ${
         dismissing ? 'opacity-0' : 'opacity-100'
       }`}
       style={{ boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)' }}
     >
-      <div className="flex h-6 items-center gap-[5px]">
+      <div className="flex h-4 items-center gap-[6px]">
         {Array.from({ length: BAR_COUNT }).map((_, i) => {
           const dotIdx = DOT_INDICES.indexOf(i as typeof DOT_INDICES[number])
           const isDotPosition = dotIdx >= 0
 
-          // Steeper response curve (^0.45 instead of sqrt) so quiet
-          // speech still produces visible movement and louder peaks
-          // hit ceiling fast — the waveform reads more responsive.
+          // Gentler response curve (^0.55) plus a slight floor so
+          // ambient noise and breath don't drive visible bars — the
+          // waveform shapes the user's voice envelope, not every
+          // micro-fluctuation. Max bar height capped at 16px so the
+          // waveform reads slim against the pill.
           const amp = ampForBar(amplitudes, i)
-          const liveHeight = Math.max(3, Math.pow(amp, 0.45) * 24)
+          const liveHeight = Math.max(2, Math.pow(amp, 0.55) * 16)
 
           // Listening: bars driven by amplitudes.
           // Polishing/error: 3 dots remain (rounded square 4×4), others collapse.
