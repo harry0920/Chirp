@@ -184,6 +184,44 @@
     50% { opacity: 1; transform: scale(1); }
   }
 
+  /* Sparkline draw-in. Pairs with `pathLength={1}` on the polyline so
+     stroke-dasharray:1 / stroke-dashoffset:1→0 maps cleanly to "draw
+     left-to-right", regardless of the SVG's actual rendered width
+     under preserveAspectRatio="none". 600ms cubic ease-out. */
+  @keyframes sparkline-draw-in {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
+  .animate-sparkline-draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: sparkline-draw-in 600ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  /* The amber dot that lands at the end of the sparkline fades in
+     once the line completes. */
+  @keyframes sparkline-dot-in {
+    from { opacity: 0; transform: scale(0.6); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .animate-sparkline-dot {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: sparkline-dot-in 200ms cubic-bezier(0.4, 0, 0.2, 1) 600ms both;
+  }
+
+  /* Heatmap cell bloom — used by the "When you dictate" card. Each
+     cell gets a per-cell `animation-delay` inline so the grid blooms
+     diagonally from top-left. fill-mode `both` keeps the cell at its
+     final saturation after the animation completes. */
+  @keyframes heatmap-cell-bloom {
+    from { opacity: 0; transform: scale(0.85); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .animate-heatmap-cell {
+    transform-origin: center;
+    animation: heatmap-cell-bloom 320ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
   /* Stagger delay utilities for entrance animations */
   .stagger-1 { animation-delay: 80ms; }
   .stagger-2 { animation-delay: 160ms; }
