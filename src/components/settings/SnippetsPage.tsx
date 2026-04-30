@@ -158,7 +158,7 @@ export function SnippetsPage() {
       )}
 
       {/* Add row */}
-      <div className="flex flex-col gap-3">
+      <div className="card-surface flex flex-col gap-3 p-5">
         <input
           type="text"
           value={newTrigger}

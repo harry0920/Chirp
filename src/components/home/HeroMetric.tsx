@@ -21,7 +21,7 @@ export function HeroMetric({ daily, totalWords, period, onPeriodChange }: Props)
   const hasData = sparklineData.some((v) => v > 0)
 
   return (
-    <section className="halo-hero relative">
+    <section className="card-surface halo-hero relative px-8 py-7">
       <div className="flex items-start justify-between">
         <span className="font-geist text-[11px] font-medium uppercase tracking-[0.18em] text-white/45">
           Words this {period === 'all' ? 'lifetime' : period}

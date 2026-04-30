@@ -7,6 +7,39 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign card layer (Phase 9)
+
+Fey uses cards as a structural layout device — every content block sits
+on a slightly-lifted dark surface with a hairline border, grouping
+related content and bounding whitespace so the canvas reads as
+intentional space rather than empty void. The redesign was missing this
+layer; pages felt either bare (Home) or wall-to-wall (Vocabulary,
+Snippets, Settings). This phase introduces a unified card surface
+across every page.
+
+#### Added
+- `.card-surface` utility class — `#0E0E10` background, 1px white-6%
+  border, faint inset top highlight, `14px` radius. Eyedropped from
+  Fey reference imagery (canvas at `#000`, card body averaged
+  `#0b0a0c`, top-edge `#1a1a1c` — flat `#0E0E10` plus subtle inset
+  reads similarly without painting a per-card gradient).
+
+#### Changed
+- `theme-pitch` palette bumped: `--color-card` from
+  `rgba(255,255,255,0.025)` (~`#060606` on black) to `#0E0E10`. So
+  every existing dm-* / `bg-card` consumer (Vocabulary, Snippets,
+  Settings, Pro) gets the visible card lift automatically.
+- Home: hero block wrapped in a card (label + number + sparkline +
+  period toggle live inside it). Patterns row's three cards switched
+  from inline `bg-white/[0.02]` to `card-surface`. Recents list now
+  inside a card with the section label sitting above on canvas.
+  Test Dictation day-0 card uses `card-surface`.
+- History: each day group becomes its own card with a top header band
+  (date + sessions/words counts), entry list inside.
+- Snippets: add-snippet form wrapped in its own card below the list.
+- Vocabulary already had the table inside a card wrapper; bumped
+  card token now makes it visibly lifted from the canvas.
+
 ### 2026-04-30 — UI redesign tray icon (Phase 8)
 
 #### Changed

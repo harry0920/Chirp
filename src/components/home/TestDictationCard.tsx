@@ -9,7 +9,7 @@ export function TestDictationCard() {
   const verb = hotkeyMode === 'tap' ? 'Tap' : 'Hold'
 
   return (
-    <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8">
+    <section className="card-surface p-8">
       <div className="flex flex-col items-start gap-5">
         <span className="font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
           Try it

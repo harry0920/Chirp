@@ -177,8 +177,8 @@ export function HistoryPage() {
       ) : (
         <div className="flex flex-col gap-10">
           {sections.map((section) => (
-            <section key={section.key}>
-              <div className="mb-3 flex items-baseline justify-between">
+            <section key={section.key} className="card-surface overflow-hidden">
+              <div className="flex items-baseline justify-between border-b border-white/[0.06] px-5 py-3">
                 <h3 className="font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
                   {section.label}
                 </h3>
@@ -189,7 +189,7 @@ export function HistoryPage() {
                   {section.entries.length} sessions · {section.totalWords.toLocaleString()} words
                 </span>
               </div>
-              <ul className="divide-y divide-white/[0.06]">
+              <ul className="divide-y divide-white/[0.06] px-5">
                 {section.entries.map((entry) => {
                   const appDisplay = entry.targetApp ? resolveAppDisplay(entry.targetApp) : null
                   return (

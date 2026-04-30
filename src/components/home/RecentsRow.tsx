@@ -31,7 +31,7 @@ export function RecentsRow({ entries, onCopy, onDelete, onViewAll, resolveAppDis
 
   return (
     <section>
-      <header className="mb-4 flex items-center justify-between">
+      <header className="mb-3 flex items-center justify-between px-1">
         <span className="font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
           Recent
         </span>
@@ -44,7 +44,7 @@ export function RecentsRow({ entries, onCopy, onDelete, onViewAll, resolveAppDis
         </button>
       </header>
 
-      <ul className="divide-y divide-white/[0.06]">
+      <ul className="card-surface divide-y divide-white/[0.06] px-5">
         {entries.map((entry) => {
           const appDisplay = entry.targetApp ? resolveAppDisplay(entry.targetApp) : null
           const id = entry.timestamp
