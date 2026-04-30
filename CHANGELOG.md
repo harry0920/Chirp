@@ -7,6 +7,35 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign overlay rebuild (Phase 5)
+
+#### Changed
+- Rewrote the recording overlay to be strictly transient. The overlay
+  no longer renders idle, ready, or done states. Listening is the
+  Sparkline waveform driven by mic amplitudes (white sharp-jagged
+  line, amber dot at the rightmost peak). Processing/polishing render
+  three breathing white dots. Error renders three red dots that flash
+  and fade. Each arc dismisses itself; the text appearing at the
+  cursor is the only "done" cue.
+- Reposition mode kept but restyled: dark glass backdrop, dark glass
+  pill with white BirdMark and "Chirp" label while dragging, snap-grid
+  dots in the new vocabulary.
+
+#### Removed
+- `Listening.tsx`, `Processing.tsx`, `Polishing.tsx`, `Done.tsx`,
+  `Error.tsx` per-state files — collapsed into the new
+  `TransientCanvas.tsx` driven by a single mode prop.
+- The "passive overlay" / always-on idle indicator branch in
+  `Overlay.tsx`. Tray icon now owns always-on status; the overlay is
+  summoned and gone.
+
+#### Added
+- `src/components/overlay/TransientCanvas.tsx` — renders either the
+  Sparkline-shaped waveform or the three-dot pulse based on mode.
+- `@keyframes overlay-dot-pulse` in `globals.css` — opacity 0.45→1
+  with subtle scale, 900ms ease-in-out infinite, used by the three
+  dots in polish/error states.
+
 ### 2026-04-30 — UI redesign Home page rebuild (Phase 4)
 
 #### Changed

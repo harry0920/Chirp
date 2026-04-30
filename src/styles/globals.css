@@ -129,6 +129,12 @@
     pointer-events: none;
   }
 
+  /* Transient overlay's polish/error dot pulse */
+  @keyframes overlay-dot-pulse {
+    0%, 100% { opacity: 0.45; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
   /* Stagger delay utilities for entrance animations */
   .stagger-1 { animation-delay: 80ms; }
   .stagger-2 { animation-delay: 160ms; }
