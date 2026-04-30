@@ -7,6 +7,26 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign chassis (Phase 2)
+
+#### Added
+- Floating glass dock at `src/components/dock/Dock.tsx` — pure-black
+  pill anchored bottom-center, BirdMark on the left + nav icons (Home,
+  Dictionary, Snippets, Settings), backdrop-blur + 1px white-10%
+  border, halo behind the active icon and brand mark.
+
+#### Changed
+- Rewrote `src/components/settings/Settings.tsx` for the new chassis:
+  full-bleed black canvas, custom titlebar reduced to drag region +
+  Windows window controls only, sidebar removed entirely. Hotkey card,
+  Support Chirp link, Chirp Pro footer button, sidebar version button,
+  and the warm `bg-surface` content area are gone — those affordances
+  either move (hotkey → Home readiness pill, version → About modal) or
+  retire.
+- Existing pages (Home, Dictionary, Snippets, Settings, Pro) still
+  render their pre-redesign content and will look broken on black
+  until each is rebuilt in subsequent phases.
+
 ### 2026-04-30 — UI redesign foundation (Phase 1)
 
 Foundation work for the dark, type-led UI redesign tracked in
