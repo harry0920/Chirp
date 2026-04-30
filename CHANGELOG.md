@@ -7,6 +7,29 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign History page + theme-pitch palette (Phase 6)
+
+#### Added
+- New `src/components/settings/HistoryPage.tsx` — search input + Export
+  button at the top, day-grouped list with totals headers, per-entry
+  app-context metadata (`Slack · 12s · 47 words · polished`),
+  copy/delete on hover, sticky bottom totals strip in
+  `Total · 47,238 words · 312 sessions · 14h 22m back` style.
+- `history` route added to the dock (`Clock` icon) and the Settings
+  page router. The "View all →" link from Home's recents now lands.
+- `.theme-pitch` palette in `globals.css` — re-themes every dm-* /
+  surface / card / row-separator token to a pitch-black, white-on-rgba
+  vocabulary. Applied at the chassis root in `Settings.tsx` so every
+  child page (Home, History, Dictionary, Snippets, Settings, Pro)
+  inherits the dark canvas without per-page restyles.
+
+#### Changed
+- Dictionary, Snippets, Settings, and Pro pages keep their existing
+  JSX but now read coherently on the new black canvas via the
+  theme-pitch palette. Per-page typographic restyles (Geist swap,
+  spacing, header treatment) are deferred to a follow-up phase — they
+  no longer look broken in the meantime.
+
 ### 2026-04-30 — UI redesign overlay rebuild (Phase 5)
 
 #### Changed

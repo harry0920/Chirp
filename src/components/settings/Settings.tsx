@@ -9,6 +9,7 @@ import { AboutModal } from '../shared/AboutModal'
 import { UpgradeModal } from '../shared/UpgradeModal'
 import { Dock } from '../dock/Dock'
 import { HomePage } from './HomePage'
+import { HistoryPage } from './HistoryPage'
 import { VocabularyPage } from './VocabularyPage'
 import { SnippetsPage } from './SnippetsPage'
 import { ProPage } from './ProPage'
@@ -16,6 +17,7 @@ import { SettingsPage } from './SettingsPage'
 
 const PAGES: Record<string, React.FC> = {
   home: HomePage,
+  history: HistoryPage,
   vocabulary: VocabularyPage,
   snippets: SnippetsPage,
   pro: ProPage,
@@ -69,7 +71,7 @@ export function Settings() {
   const PageComponent = PAGES[settingsPage] ?? HomePage
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-black no-select font-geist text-white">
+    <div className="theme-pitch flex h-screen flex-col overflow-hidden bg-black no-select font-geist text-white">
       {/* Custom titlebar — drag region + Windows window controls */}
       <div
         data-tauri-drag-region

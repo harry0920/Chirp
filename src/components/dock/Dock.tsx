@@ -1,4 +1,4 @@
-import { BookText, Home, Settings as SettingsIcon, Zap } from 'lucide-react'
+import { BookText, Clock, Home, Settings as SettingsIcon, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { BirdMark } from '../shared/BirdMark'
@@ -11,6 +11,7 @@ interface DockItem {
 
 const DOCK_ITEMS: DockItem[] = [
   { id: 'home', label: 'Home', icon: Home },
+  { id: 'history', label: 'History', icon: Clock },
   { id: 'vocabulary', label: 'Dictionary', icon: BookText },
   { id: 'snippets', label: 'Snippets', icon: Zap },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
