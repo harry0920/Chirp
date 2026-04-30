@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Copy, Download, Search, Trash2 } from 'lucide-react'
+import { Copy, Download, Search, Trash2, X } from 'lucide-react'
+import { BirdMark } from '../shared/BirdMark'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import type { TranscriptionEntry } from '../../stores/appStore'
@@ -149,7 +150,7 @@ export function HistoryPage() {
 
   return (
     <div>
-      <header className="mb-8 flex items-center gap-3">
+      <header className="animate-slide-up stagger-1 mb-8 flex items-center gap-3">
         <div className="relative flex-1">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
           <input
@@ -157,8 +158,18 @@ export function HistoryPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search dictations"
-            className="w-full rounded-full border border-white/10 bg-white/[0.03] py-2 pl-9 pr-4 font-geist text-[13px] text-white placeholder:text-white/30 focus:border-white/30 focus:outline-none"
+            className="w-full rounded-full border border-white/10 bg-white/[0.03] py-2 pl-9 pr-9 font-geist text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-chirp-yellow/50 focus:outline-none focus:ring-1 focus:ring-chirp-yellow/30"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+              className="absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/[0.06] hover:text-white"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
         <button
           type="button"
@@ -171,13 +182,20 @@ export function HistoryPage() {
       </header>
 
       {sections.length === 0 ? (
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-12 text-center font-geist text-[13px] text-white/45">
-          {search ? 'No dictations match your search.' : 'No dictations yet.'}
+        <div className="animate-fade-in flex flex-col items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-16 text-center">
+          <BirdMark size={32} color="rgba(255, 255, 255, 0.12)" />
+          <p className="font-geist text-[13px] text-white/45">
+            {search ? 'No dictations match your search.' : 'No dictations yet.'}
+          </p>
         </div>
       ) : (
         <div className="flex flex-col gap-10">
-          {sections.map((section) => (
-            <section key={section.key} className="card-surface overflow-hidden">
+          {sections.map((section, sectionIdx) => (
+            <section
+              key={section.key}
+              className="card-surface animate-slide-up overflow-hidden"
+              style={{ animationDelay: `${160 + sectionIdx * 160}ms` }}
+            >
               <div className="flex items-baseline justify-between border-b border-white/[0.06] px-5 py-3">
                 <h3 className="font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
                   {section.label}
@@ -190,12 +208,13 @@ export function HistoryPage() {
                 </span>
               </div>
               <ul className="divide-y divide-white/[0.06] px-5">
-                {section.entries.map((entry) => {
+                {section.entries.map((entry, entryIdx) => {
                   const appDisplay = entry.targetApp ? resolveAppDisplay(entry.targetApp) : null
                   return (
                     <li
                       key={entry.timestamp}
-                      className="group grid grid-cols-[64px_1fr_auto] items-start gap-4 py-3"
+                      className="group grid grid-cols-[64px_1fr_auto] items-start gap-4 py-3 transition-colors animate-fade-in -mx-5 px-5 hover:bg-white/[0.02]"
+                      style={{ animationDelay: `${Math.min(entryIdx * 40, 600)}ms` }}
                     >
                       <span
                         className="pt-0.5 font-geist-mono text-[11px] text-white/35"
