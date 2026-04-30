@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Copy, Trash2 } from 'lucide-react'
 import type { TranscriptionEntry } from '../../stores/appStore'
 
@@ -28,6 +28,20 @@ function formatDuration(ms: number): string {
 
 export function RecentsRow({ entries, onCopy, onDelete, onViewAll, resolveAppDisplay }: Props) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const previousTopRef = useRef<string | null>(entries[0]?.timestamp ?? null)
+  const [poppedTimestamp, setPoppedTimestamp] = useState<string | null>(null)
+
+  // When a NEW dictation lands, the top entry's timestamp changes.
+  // Spring-pop just that row for instant feedback.
+  useEffect(() => {
+    const newTop = entries[0]?.timestamp ?? null
+    if (newTop && newTop !== previousTopRef.current) {
+      previousTopRef.current = newTop
+      setPoppedTimestamp(newTop)
+      const timer = setTimeout(() => setPoppedTimestamp(null), 600)
+      return () => clearTimeout(timer)
+    }
+  }, [entries])
 
   return (
     <section>
@@ -45,14 +59,18 @@ export function RecentsRow({ entries, onCopy, onDelete, onViewAll, resolveAppDis
       </header>
 
       <ul className="card-surface divide-y divide-white/[0.06] px-5">
-        {entries.map((entry) => {
+        {entries.map((entry, i) => {
           const appDisplay = entry.targetApp ? resolveAppDisplay(entry.targetApp) : null
           const id = entry.timestamp
           const copied = copiedId === id
+          const popped = poppedTimestamp === id
           return (
             <li
               key={id}
-              className="group grid grid-cols-[64px_1fr_auto] items-start gap-4 py-3"
+              className={`group grid grid-cols-[64px_1fr_auto] items-start gap-4 py-3 ${
+                popped ? 'animate-saved-pop' : 'animate-fade-in'
+              }`}
+              style={popped ? undefined : { animationDelay: `${i * 80}ms` }}
             >
               <span
                 className="pt-0.5 font-geist-mono text-[11px] text-white/35"

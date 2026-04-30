@@ -21,15 +21,21 @@ export function PatternsRow({
   totalDurationMs,
 }: Props) {
   return (
-    <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <WhenYouDictate hourlyGrid={hourlyGrid} />
-      <WhereYouDictate apps={topApps} />
-      <WhatYouSay
-        totalWords={totalWords}
-        totalSessions={totalSessions}
-        longestDictationWords={longestDictationWords}
-        totalDurationMs={totalDurationMs}
-      />
+    <section className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+      <div className="animate-slide-up stagger-1 flex">
+        <WhenYouDictate hourlyGrid={hourlyGrid} />
+      </div>
+      <div className="animate-slide-up stagger-2 flex">
+        <WhereYouDictate apps={topApps} />
+      </div>
+      <div className="animate-slide-up stagger-3 flex">
+        <WhatYouSay
+          totalWords={totalWords}
+          totalSessions={totalSessions}
+          longestDictationWords={longestDictationWords}
+          totalDurationMs={totalDurationMs}
+        />
+      </div>
     </section>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { DailyPoint, Period } from './types'
 import { Sparkline } from '../shared/Sparkline'
 
@@ -24,10 +24,10 @@ const PERIOD_NOUN: Record<Period, string> = {
 }
 
 /** Count animation from previous value to new target on every change.
- *  Returns the in-flight value to render. */
-function useAnimatedNumber(target: number, duration = 500): number {
-  const [value, setValue] = useState(target)
-  const prevRef = useRef(target)
+ *  First mount counts up from 0 so the hero has motion on entrance. */
+function useAnimatedNumber(target: number, duration = 700): number {
+  const [value, setValue] = useState(0)
+  const prevRef = useRef(0)
   const rafRef = useRef<number>(0)
 
   useEffect(() => {
@@ -96,7 +96,7 @@ export function HeroMetric({ daily, totalWords, period, onPeriodChange }: Props)
             strokeWidth={1.25}
             dotRadius={2.75}
             endRatio={2 / 3}
-            className="animate-fade-in h-full w-full"
+            className="h-full w-full"
           />
         ) : (
           <div className="flex h-full w-full items-end px-7">
@@ -109,14 +109,43 @@ export function HeroMetric({ daily, totalWords, period, onPeriodChange }: Props)
 }
 
 function PeriodToggle({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const [underline, setUnderline] = useState<{ left: number; width: number } | null>(null)
+
+  // Re-measure the active button on period change AND on container resize.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const idx = PERIODS.findIndex((p) => p.id === period)
+      const btn = buttonRefs.current[idx]
+      const container = containerRef.current
+      if (!btn || !container) return
+      const containerRect = container.getBoundingClientRect()
+      const btnRect = btn.getBoundingClientRect()
+      setUnderline({
+        left: btnRect.left - containerRect.left,
+        width: btnRect.width,
+      })
+    }
+    measure()
+    if (!containerRef.current) return
+    const ro = new ResizeObserver(measure)
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [period])
+
   return (
-    <div className="mb-3 flex items-center gap-1 font-geist text-[11px] uppercase tracking-[0.16em]">
+    <div
+      ref={containerRef}
+      className="relative mb-3 flex items-center gap-1 font-geist text-[11px] uppercase tracking-[0.16em]"
+    >
       {PERIODS.map((p, i) => (
         <span key={p.id} className="flex items-center gap-1">
           <button
+            ref={(el) => { buttonRefs.current[i] = el }}
             type="button"
             onClick={() => onChange(p.id)}
-            className={`transition-colors ${
+            className={`relative transition-colors ${
               p.id === period ? 'text-white' : 'text-white/40 hover:text-white/70'
             }`}
           >
@@ -125,6 +154,18 @@ function PeriodToggle({ period, onChange }: { period: Period; onChange: (p: Peri
           {i < PERIODS.length - 1 && <span className="text-white/20">·</span>}
         </span>
       ))}
+      {underline && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -bottom-1 h-px bg-chirp-yellow"
+          style={{
+            left: `${underline.left}px`,
+            width: `${underline.width}px`,
+            transition:
+              'left 280ms cubic-bezier(0.34, 1.56, 0.64, 1), width 280ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+          }}
+        />
+      )}
     </div>
   )
 }

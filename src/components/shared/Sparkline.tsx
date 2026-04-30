@@ -14,6 +14,10 @@ interface SparklineProps {
    *  Default 1 (right edge). Use a value <1 to leave "future" space
    *  on the right of the chart. */
   endRatio?: number
+  /** Draw the line in left-to-right on mount. Default true.
+   *  Pairs with `pathLength={1}` on the polyline so the dasharray
+   *  trick renders cleanly under preserveAspectRatio="none". */
+  animateOnMount?: boolean
   className?: string
 }
 
@@ -28,6 +32,7 @@ export function Sparkline({
   showDot = true,
   padding = 4,
   endRatio = 1,
+  animateOnMount = true,
   className = '',
 }: SparklineProps) {
   if (data.length === 0) {
@@ -76,6 +81,8 @@ export function Sparkline({
           strokeLinejoin="miter"
           strokeLinecap="butt"
           vectorEffect="non-scaling-stroke"
+          pathLength={animateOnMount ? 1 : undefined}
+          className={animateOnMount ? 'animate-sparkline-draw' : undefined}
         />
       )}
       {showDot && (
@@ -85,6 +92,7 @@ export function Sparkline({
           r={dotRadius}
           fill={dotColor}
           vectorEffect="non-scaling-stroke"
+          className={animateOnMount ? 'animate-sparkline-dot' : undefined}
         />
       )}
     </svg>

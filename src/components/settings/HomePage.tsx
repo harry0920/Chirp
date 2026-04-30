@@ -145,12 +145,14 @@ export function HomePage() {
           <AttentionStrip items={attention} onAction={handleAttentionAction} />
         )}
 
-        <HeroMetric
-          daily={patterns?.daily ?? []}
-          totalWords={patterns?.totalWords ?? 0}
-          period={period}
-          onPeriodChange={setPeriod}
-        />
+        <div className="animate-slide-up">
+          <HeroMetric
+            daily={patterns?.daily ?? []}
+            totalWords={patterns?.totalWords ?? 0}
+            period={period}
+            onPeriodChange={setPeriod}
+          />
+        </div>
 
         <PatternsRow
           hourlyGrid={patterns?.hourlyGrid ?? Array.from({ length: 7 }, () => Array(24).fill(0))}
@@ -161,17 +163,19 @@ export function HomePage() {
           totalDurationMs={patterns?.totalDurationMs ?? 0}
         />
 
-        {isEmpty ? (
-          <TestDictationCard />
-        ) : (
-          <RecentsRow
-            entries={recents}
-            onCopy={handleCopy}
-            onDelete={handleDelete}
-            onViewAll={handleViewAll}
-            resolveAppDisplay={resolveAppDisplay}
-          />
-        )}
+        <div className="animate-slide-up stagger-4">
+          {isEmpty ? (
+            <TestDictationCard />
+          ) : (
+            <RecentsRow
+              entries={recents}
+              onCopy={handleCopy}
+              onDelete={handleDelete}
+              onViewAll={handleViewAll}
+              resolveAppDisplay={resolveAppDisplay}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

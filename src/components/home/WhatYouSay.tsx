@@ -25,7 +25,7 @@ export function WhatYouSay({
   const avgWords = totalSessions > 0 ? Math.round(totalWords / totalSessions) : 0
 
   return (
-    <article className="card-surface p-5">
+    <article className="card-surface w-full p-5">
       <header className="mb-4 flex items-center justify-between">
         <span className="font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
           What you say
