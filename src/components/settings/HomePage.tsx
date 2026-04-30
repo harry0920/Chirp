@@ -125,8 +125,8 @@ export function HomePage() {
   const isEmpty = history.length === 0
 
   return (
-    <div className="relative mx-auto max-w-[1080px] px-12 pt-10">
-      <div className="absolute right-12 top-10 z-10">
+    <div className="relative">
+      <div className="absolute right-0 top-0 z-10">
         <ReadinessPill />
       </div>
 

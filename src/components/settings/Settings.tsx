@@ -108,9 +108,12 @@ export function Settings() {
         )}
       </div>
 
-      {/* Full-bleed content */}
+      {/* Full-bleed content with consistent gutters across every page */}
       <main className="relative flex-1 overflow-y-auto overflow-x-hidden">
-        <div key={settingsPage} className="animate-fade-in pb-32">
+        <div
+          key={settingsPage}
+          className="animate-fade-in mx-auto w-full max-w-[1080px] px-12 pt-10 pb-32"
+        >
           <PageComponent />
         </div>
       </main>

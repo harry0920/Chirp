@@ -7,6 +7,19 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign chassis gutter fix
+
+- Moved the page gutter wrapper (`mx-auto w-full max-w-[1080px]
+  px-12 pt-10 pb-32`) up from individual pages (Home, History) to the
+  chassis in `Settings.tsx`. Vocabulary, Snippets, Settings, and Pro
+  were inheriting the chassis directly with no max-width or
+  horizontal padding, so their content stretched wall-to-wall and
+  read as wall-of-noise rather than contained content.
+- Dropped now-redundant inner wrappers from `HomePage.tsx` and
+  `HistoryPage.tsx`. The Home readiness pill is now anchored
+  `top-0 right-0` relative to the page root rather than the
+  page-internal padding.
+
 ### 2026-04-30 — UI redesign card layer (Phase 9)
 
 Fey uses cards as a structural layout device — every content block sits
