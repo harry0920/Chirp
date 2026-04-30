@@ -1,13 +1,19 @@
+use crate::app_names;
 use crate::audio;
 use crate::cleanup;
 use crate::history;
 use crate::inject;
 use crate::llm;
+use crate::llm::CleanupBackend;
+use crate::secrets;
 use crate::settings;
 use crate::snippets;
 use crate::state::*;
 use crate::transcribe;
 
+use chrono::{Datelike, Timelike};
+use serde::Serialize;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Cursor;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -770,7 +776,8 @@ pub async fn stop_recording(
         vocab,
         snips,
         ai_cleanup,
-        llm_port,
+        cleanup_backend,
+        backend_kind,
         tone_mode,
         http_client,
         vad_was_active,
@@ -780,13 +787,16 @@ pub async fn stop_recording(
         let vad_was_active = s.vad_was_active;
         // Reset for the next recording session, regardless of which path we take.
         s.vad_was_active = false;
+        let backend = build_cleanup_backend(&s.settings, s.llm_port);
+        let backend_kind = backend_kind_label(&s.settings.cleanup_provider);
         (
             rec,
             s.settings.smart_formatting,
             s.vocabulary.clone(),
             s.snippets.clone(),
             s.settings.ai_cleanup,
-            s.llm_port,
+            backend,
+            backend_kind,
             s.settings.tone_mode.clone(),
             s.http_client.clone(),
             vad_was_active,
@@ -911,21 +921,24 @@ pub async fn stop_recording(
         }
     };
 
-    // AI cleanup pass (if enabled and server is running). Both VAD and
+    // AI cleanup pass (if enabled and a backend is available). Both VAD and
     // fallback paths arrive here after deterministic regex/vocabulary cleanup.
     let mut was_cleaned_up = streaming_was_cleaned_up;
     let formatted_word_count = formatted.split_whitespace().count();
     let skip_ai_for_short_message =
         tone_mode != "email" && formatted_word_count < MIN_AI_CLEANUP_WORDS;
+    let cleanup_backend_available = cleanup_backend.is_some();
     let result = if !streaming_was_cleaned_up
         && ai_cleanup
-        && llm_port.is_some()
+        && cleanup_backend_available
         && !skip_ai_for_short_message
     {
-        let port = llm_port.unwrap();
         let _ = app_handle.emit("recording-state", "polishing");
-        log::info!("Running AI cleanup on text...");
-        match llm::cleanup_text(port, &formatted, &tone_mode, &http_client).await {
+        let backend = cleanup_backend.expect("checked cleanup_backend_available");
+        log::info!("Running {backend_kind} cleanup on text...");
+        let cleanup_result = llm::cleanup_text(backend, &formatted, &tone_mode, &http_client).await;
+
+        match cleanup_result {
             Ok(cleaned) => {
                 log::info!("LLM cleanup: '{cleaned}'");
                 was_cleaned_up = true;
@@ -939,10 +952,12 @@ pub async fn stop_recording(
     } else {
         if !streaming_was_cleaned_up
             && ai_cleanup
-            && llm_port.is_some()
+            && cleanup_backend_available
             && skip_ai_for_short_message
         {
             log::info!("Skipping AI cleanup for short message ({formatted_word_count} words)");
+        } else if !streaming_was_cleaned_up && ai_cleanup && !cleanup_backend_available {
+            log::warn!("Skipping AI cleanup: {backend_kind} backend is not available");
         }
         formatted
     };
@@ -959,20 +974,23 @@ pub async fn stop_recording(
     let duration_ms = start_time.elapsed().as_millis() as u64;
     let word_count = result.split_whitespace().count();
 
-    // Inject text at cursor
+    // Inject text at cursor. Capture the foreground app on the same main-thread
+    // hop so we record the target the user actually pasted into.
     log::debug!("Injecting transcribed text: '{result}'");
     let text_for_inject = result.clone();
     let app_for_inject = app_handle.clone();
-    let inject_result: Result<(), String> = {
+    let inject_outcome: Result<(Option<String>, Result<(), String>), String> = {
         let (tx, rx) = tokio::sync::oneshot::channel();
         app_for_inject
             .run_on_main_thread(move || {
+                let captured = inject::capture_foreground_app();
                 let r = inject::inject_text(&text_for_inject);
-                let _ = tx.send(r);
+                let _ = tx.send((captured, r));
             })
             .map_err(|e| format!("Dispatch failed: {e}"))?;
-        rx.await.map_err(|e| format!("Channel failed: {e}"))?
+        Ok(rx.await.map_err(|e| format!("Channel failed: {e}"))?)
     };
+    let (target_app, inject_result) = inject_outcome?;
 
     if let Err(e) = inject_result {
         let mut s = state.lock().await;
@@ -994,6 +1012,7 @@ pub async fn stop_recording(
         duration_ms,
         speech_duration_ms,
         was_cleaned_up,
+        target_app,
     });
     // Cap in-memory history to 1000 entries (matches save_history cap)
     if s.history.len() > 1000 {
@@ -1348,26 +1367,111 @@ pub async fn stop_llm(state: State<'_, SharedState>) -> Result<(), String> {
     Ok(())
 }
 
+/// Build a `CleanupBackend` from the current settings + keychain. Returns
+/// `None` when the active provider has no usable backend (local server not
+/// running, or cloud provider missing an API key).
+fn build_cleanup_backend(settings: &Settings, llm_port: Option<u16>) -> Option<CleanupBackend> {
+    match settings.cleanup_provider.as_str() {
+        "local" => llm_port.map(|port| CleanupBackend::Local { port }),
+        "openai_compatible" => {
+            let key = secrets::get_api_key("openai_compatible")?;
+            let cfg = settings.cleanup_provider_configs.get("openai_compatible");
+            let model = cfg
+                .map(|c| c.model.clone())
+                .unwrap_or_else(|| OPENAI_COMPATIBLE_DEFAULT_MODEL.to_string());
+            let base_url = cfg
+                .and_then(|c| c.base_url.clone())
+                .unwrap_or_else(|| OPENAI_COMPATIBLE_DEFAULT_BASE_URL.to_string());
+            Some(CleanupBackend::OpenAICompatible {
+                base_url,
+                api_key: key,
+                model,
+            })
+        }
+        "anthropic" => {
+            let key = secrets::get_api_key("anthropic")?;
+            let model = settings
+                .cleanup_provider_configs
+                .get("anthropic")
+                .map(|c| c.model.clone())
+                .unwrap_or_else(|| ANTHROPIC_DEFAULT_MODEL.to_string());
+            Some(CleanupBackend::Anthropic { api_key: key, model })
+        }
+        "gemini" => {
+            let key = secrets::get_api_key("gemini")?;
+            let model = settings
+                .cleanup_provider_configs
+                .get("gemini")
+                .map(|c| c.model.clone())
+                .unwrap_or_else(|| GEMINI_DEFAULT_MODEL.to_string());
+            Some(CleanupBackend::Gemini { api_key: key, model })
+        }
+        _ => None,
+    }
+}
+
+fn backend_kind_label(provider: &str) -> &'static str {
+    match provider {
+        "local" => "local",
+        "openai_compatible" => "OpenAI-compatible",
+        "anthropic" => "Anthropic",
+        "gemini" => "Gemini",
+        _ => "unknown",
+    }
+}
+
 #[tauri::command]
 pub async fn test_llm_cleanup(
     text: String,
     mode: Option<String>,
     state: State<'_, SharedState>,
 ) -> Result<String, String> {
-    let (port, http_client) = {
+    let (backend, http_client) = {
         let s = state.lock().await;
-        (
-            s.llm_port.ok_or("LLM server is not running")?,
-            s.http_client.clone(),
-        )
+        let backend = build_cleanup_backend(&s.settings, s.llm_port).ok_or_else(|| {
+            format!(
+                "Cleanup backend not available for provider '{}'",
+                s.settings.cleanup_provider
+            )
+        })?;
+        (backend, s.http_client.clone())
     };
-    llm::cleanup_text(
-        port,
-        &text,
-        &mode.unwrap_or_else(|| "message".to_string()),
-        &http_client,
-    )
-    .await
+    let mode = mode.unwrap_or_else(|| "message".to_string());
+    llm::cleanup_text(backend, &text, &mode, &http_client).await
+}
+
+/// Read a stored cleanup API key from the OS keychain. Returns "" when the
+/// entry is missing so the UI can display a "no key" status without an error.
+#[tauri::command]
+pub async fn get_cleanup_api_key(provider: String) -> Result<String, String> {
+    if !secrets::is_known_provider(&provider) {
+        return Err(format!("Unknown cleanup provider: {provider}"));
+    }
+    Ok(secrets::get_api_key(&provider).unwrap_or_default())
+}
+
+/// Store a cleanup API key in the OS keychain. An empty key deletes the entry.
+#[tauri::command]
+pub async fn set_cleanup_api_key(provider: String, key: String) -> Result<(), String> {
+    if !secrets::is_known_provider(&provider) {
+        return Err(format!("Unknown cleanup provider: {provider}"));
+    }
+    secrets::set_api_key(&provider, &key)
+}
+
+/// Round-trip a small canned dictation through the active cleanup backend so
+/// the user can validate their key/model/base URL settings without speaking.
+#[tauri::command]
+pub async fn test_cleanup_connection(state: State<'_, SharedState>) -> Result<String, String> {
+    const PROBE_TEXT: &str = "i think um the meeting is at three pm";
+    let (backend, http_client) = {
+        let s = state.lock().await;
+        let backend = build_cleanup_backend(&s.settings, s.llm_port).ok_or_else(|| {
+            "No API key saved for the selected provider".to_string()
+        })?;
+        (backend, s.http_client.clone())
+    };
+    llm::cleanup_text(backend, PROBE_TEXT, "message", &http_client).await
 }
 
 #[tauri::command]
@@ -1503,4 +1607,210 @@ pub async fn capture_next_key(
     drop(s);
     let _ = crate::hotkey::start(&hotkey_str, app_handle);
     result
+}
+
+/// Daily aggregate (one entry per local calendar day).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyPoint {
+    pub date: String,
+    pub words: u32,
+    pub sessions: u32,
+    pub duration_ms: u64,
+}
+
+/// Per-app aggregate for the "Where you dictate" card.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppPoint {
+    pub raw: String,
+    pub display: String,
+    pub count: u32,
+    pub words: u32,
+    pub percent: f32,
+}
+
+/// Aggregated dictation analytics for the Home page.
+///
+/// `hourly_grid` is intentionally always all-time — it represents your
+/// dictation rhythm, not your activity in the selected period. Everything
+/// else (`daily`, `top_apps`, totals) respects the period filter.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DictationPatterns {
+    pub period: String,
+    pub hourly_grid: Vec<Vec<u32>>,
+    pub daily: Vec<DailyPoint>,
+    pub top_apps: Vec<AppPoint>,
+    pub total_words: u32,
+    pub total_sessions: u32,
+    pub total_duration_ms: u64,
+}
+
+/// Compute dictation analytics for the Home page from the in-memory history.
+///
+/// `period`: one of `"week"`, `"month"`, `"year"`, `"all"`. Defaults to `"all"`
+/// when omitted or unrecognized.
+#[tauri::command]
+pub async fn get_dictation_patterns(
+    state: State<'_, SharedState>,
+    period: Option<String>,
+) -> Result<DictationPatterns, String> {
+    let period = period.unwrap_or_else(|| "all".into());
+    let now = chrono::Utc::now();
+    let cutoff = match period.as_str() {
+        "week" => Some(now - chrono::Duration::days(7)),
+        "month" => Some(now - chrono::Duration::days(30)),
+        "year" => Some(now - chrono::Duration::days(365)),
+        _ => None,
+    };
+    let cutoff_str = cutoff.map(|d| d.to_rfc3339());
+
+    let s = state.lock().await;
+
+    let mut hourly_grid: Vec<Vec<u32>> = vec![vec![0; 24]; 7];
+    for entry in &s.history {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&entry.timestamp) {
+            let local = dt.with_timezone(&chrono::Local);
+            let day = local.weekday().num_days_from_monday() as usize;
+            let hour = local.hour() as usize;
+            if day < 7 && hour < 24 {
+                hourly_grid[day][hour] += 1;
+            }
+        }
+    }
+
+    let in_period: Vec<&TranscriptionEntry> = s
+        .history
+        .iter()
+        .filter(|e| match cutoff_str.as_ref() {
+            Some(c) => e.timestamp >= *c,
+            None => true,
+        })
+        .collect();
+
+    let mut daily_map: BTreeMap<String, (u32, u32, u64)> = BTreeMap::new();
+    for entry in &in_period {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&entry.timestamp) {
+            let local = dt.with_timezone(&chrono::Local);
+            let date_key = local.format("%Y-%m-%d").to_string();
+            let cell = daily_map.entry(date_key).or_insert((0, 0, 0));
+            cell.0 += entry.word_count as u32;
+            cell.1 += 1;
+            cell.2 += entry.duration_ms;
+        }
+    }
+    let daily: Vec<DailyPoint> = daily_map
+        .into_iter()
+        .map(|(date, (words, sessions, duration_ms))| DailyPoint {
+            date,
+            words,
+            sessions,
+            duration_ms,
+        })
+        .collect();
+
+    let mut app_counts: HashMap<String, (u32, u32)> = HashMap::new();
+    let mut total_with_app: u32 = 0;
+    for entry in &in_period {
+        if let Some(raw) = entry.target_app.as_deref() {
+            let cell = app_counts.entry(raw.to_string()).or_insert((0, 0));
+            cell.0 += 1;
+            cell.1 += entry.word_count as u32;
+            total_with_app += 1;
+        }
+    }
+    let mut top_apps: Vec<AppPoint> = app_counts
+        .into_iter()
+        .map(|(raw, (count, words))| {
+            let display = app_names::display_name(&raw);
+            let percent = if total_with_app > 0 {
+                (count as f32 / total_with_app as f32) * 100.0
+            } else {
+                0.0
+            };
+            AppPoint {
+                raw,
+                display,
+                count,
+                words,
+                percent,
+            }
+        })
+        .collect();
+    top_apps.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| b.words.cmp(&a.words)));
+    top_apps.truncate(10);
+
+    let total_words: u32 = in_period.iter().map(|e| e.word_count as u32).sum();
+    let total_sessions: u32 = in_period.len() as u32;
+    let total_duration_ms: u64 = in_period.iter().map(|e| e.duration_ms).sum();
+
+    Ok(DictationPatterns {
+        period,
+        hourly_grid,
+        daily,
+        top_apps,
+        total_words,
+        total_sessions,
+        total_duration_ms,
+    })
+}
+
+/// Severity of an attention item — drives styling on the Home strip.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AttentionSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// One actionable item on the Home page's Attention strip.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttentionItem {
+    pub id: String,
+    pub severity: AttentionSeverity,
+    pub message: String,
+    /// Optional deep-link target — frontend interprets values like
+    /// `"settings:audio"` or `"page:dictionary"`.
+    pub action: Option<String>,
+}
+
+/// Items to surface on the Home page's Attention strip. Returns an empty
+/// list when nothing needs the user's eye — silence is healthy.
+///
+/// Currently a stub that derives suggestions from history alone (e.g. recent
+/// dictation runs without an associated foreground app, which often signals
+/// an injection-permissions issue). Expanded in later phases as we add
+/// permission-state, mic-change, and misheard-word detection.
+#[tauri::command]
+pub async fn get_attention_items(
+    state: State<'_, SharedState>,
+) -> Result<Vec<AttentionItem>, String> {
+    let s = state.lock().await;
+    let mut items: Vec<AttentionItem> = Vec::new();
+
+    // Recent (last 24h) entries that completed transcription but had no
+    // captured foreground app — strong signal that injection or app-capture
+    // hit a permissions issue. Capped so we don't flood the strip on a fresh
+    // install when target_app is `None` for every legacy entry.
+    let cutoff = (chrono::Utc::now() - chrono::Duration::hours(24)).to_rfc3339();
+    let missing = s
+        .history
+        .iter()
+        .filter(|e| e.timestamp >= cutoff && e.target_app.is_none())
+        .count();
+    if missing >= 3 {
+        items.push(AttentionItem {
+            id: "missing-target-app".into(),
+            severity: AttentionSeverity::Warning,
+            message: format!(
+                "{missing} recent dictations had no detected target app. Check accessibility permissions."
+            ),
+            action: Some("settings:permissions".into()),
+        });
+    }
+
+    Ok(items)
 }

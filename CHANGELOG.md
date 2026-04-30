@@ -7,6 +7,31 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign per-app context + analytics (Phase 3)
+
+#### Added
+- Per-app context tracking. `inject::capture_foreground_app()` reads
+  `GetForegroundWindow → GetWindowThreadProcessId → OpenProcess →
+  QueryFullProcessImageNameW` on Windows, returns the executable file
+  name (e.g. `Slack.exe`). macOS stub returns `None` for now.
+- `TranscriptionEntry.target_app: Option<String>` field, written at
+  injection time. Backward-compatible: existing entries deserialize
+  with `target_app = None`. Frontend `TranscriptionEntry.targetApp`
+  type extended to match.
+- `src-tauri/resources/app-names.json` mapping ~50 common executables
+  to display names (`slack.exe → Slack`, etc.). Embedded at compile
+  time; loaded lazily via `OnceLock`.
+- `app_names::display_name(raw)` resolver — case-insensitive lookup,
+  falls back to title-cased stripped form for unknown processes.
+- `commands::get_dictation_patterns(period)` — returns the analytics
+  blob driving the Home page (`hourlyGrid` 7×24 all-time, `daily`
+  series, `topApps` with display names + percentages, totals). Period
+  supports `week | month | year | all`.
+- `commands::get_attention_items()` — skeleton command returning
+  actionable items for the Home Attention strip. Currently surfaces
+  the "missing target_app on recent entries" signal as an indicator
+  of accessibility-permission issues.
+
 ### 2026-04-30 — UI redesign chassis (Phase 2)
 
 #### Added

@@ -16,7 +16,67 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     VK_LMENU, VK_LSHIFT, VK_LWIN, VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_V,
 };
 #[cfg(windows)]
-use windows_sys::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetClassNameW, GetForegroundWindow, GetWindowThreadProcessId,
+};
+
+/// Capture the foreground window's process executable file name (e.g. "slack.exe").
+/// Used to attach app context to history entries. Returns `None` on platforms
+/// without an implementation, or when the OS denies access. Never errors —
+/// missing app context is fine, capture is opportunistic.
+#[cfg(windows)]
+pub fn capture_foreground_app() -> Option<String> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_null() {
+            return None;
+        }
+
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == 0 {
+            return None;
+        }
+
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return None;
+        }
+
+        let mut buf = [0u16; 1024];
+        let mut size: u32 = buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(handle, 0, buf.as_mut_ptr(), &mut size);
+        CloseHandle(handle);
+
+        if ok == 0 || size == 0 {
+            return None;
+        }
+
+        let path = String::from_utf16_lossy(&buf[..size as usize]);
+        let file_name = path
+            .rsplit(['\\', '/'])
+            .next()
+            .unwrap_or(&path)
+            .trim()
+            .to_string();
+        if file_name.is_empty() {
+            None
+        } else {
+            Some(file_name)
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn capture_foreground_app() -> Option<String> {
+    // TODO: macOS implementation via NSWorkspace.frontmostApplication.
+    None
+}
 
 /// Inject text at the current cursor position.
 /// On Windows: Win32 clipboard with exclusion flags + wait-for-release modifiers.

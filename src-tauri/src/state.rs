@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sherpa_onnx::OfflineRecognizer;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -76,12 +77,62 @@ pub struct Settings {
     pub beam_search: bool,
     #[serde(default = "default_cleanup_model")]
     pub cleanup_model: String,
+    #[serde(default = "default_cleanup_provider")]
+    pub cleanup_provider: String,
+    #[serde(default = "default_cleanup_provider_configs")]
+    pub cleanup_provider_configs: HashMap<String, CleanupProviderConfig>,
     #[serde(default)]
     pub dark_mode: bool,
 }
 
+/// Per-provider cleanup config. Keys (API keys) are NOT stored here — they
+/// live in the OS keychain. This struct only persists non-sensitive choices.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupProviderConfig {
+    pub model: String,
+    /// Only meaningful for the openai_compatible provider. None elsewhere.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+}
+
+pub const OPENAI_COMPATIBLE_DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
+pub const OPENAI_COMPATIBLE_DEFAULT_MODEL: &str = "gpt-4.1-mini";
+pub const ANTHROPIC_DEFAULT_MODEL: &str = "claude-haiku-4-5";
+pub const GEMINI_DEFAULT_MODEL: &str = "gemini-2.5-flash";
+
 fn default_cleanup_model() -> String {
     "chirp-v2".into()
+}
+
+fn default_cleanup_provider() -> String {
+    "local".into()
+}
+
+pub fn default_cleanup_provider_configs() -> HashMap<String, CleanupProviderConfig> {
+    let mut map = HashMap::new();
+    map.insert(
+        "openai_compatible".to_string(),
+        CleanupProviderConfig {
+            model: OPENAI_COMPATIBLE_DEFAULT_MODEL.into(),
+            base_url: Some(OPENAI_COMPATIBLE_DEFAULT_BASE_URL.into()),
+        },
+    );
+    map.insert(
+        "anthropic".to_string(),
+        CleanupProviderConfig {
+            model: ANTHROPIC_DEFAULT_MODEL.into(),
+            base_url: None,
+        },
+    );
+    map.insert(
+        "gemini".to_string(),
+        CleanupProviderConfig {
+            model: GEMINI_DEFAULT_MODEL.into(),
+            base_url: None,
+        },
+    );
+    map
 }
 
 fn default_overlay_position() -> serde_json::Value {
@@ -116,6 +167,8 @@ impl Default for Settings {
             help_improve: false,
             beam_search: false,
             cleanup_model: "chirp-v2".into(),
+            cleanup_provider: "local".into(),
+            cleanup_provider_configs: default_cleanup_provider_configs(),
             dark_mode: false,
         }
     }
@@ -193,6 +246,11 @@ pub struct TranscriptionEntry {
     pub speech_duration_ms: u64,
     #[serde(default)]
     pub was_cleaned_up: bool,
+    /// Raw foreground process name at injection time (e.g. "Slack.exe").
+    /// `None` for entries written before capture was added, or when the
+    /// platform/permissions prevented capture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_app: Option<String>,
 }
 
 /// Model download/presence status

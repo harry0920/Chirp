@@ -1,9 +1,11 @@
 mod announcements;
+mod app_names;
 mod audio;
 mod cleanup;
 mod commands;
 mod feedback;
 mod history;
+mod secrets;
 #[cfg(windows)]
 mod clipboard_win;
 mod inject;
@@ -161,6 +163,9 @@ pub fn run() {
             commands::start_llm,
             commands::stop_llm,
             commands::test_llm_cleanup,
+            commands::get_cleanup_api_key,
+            commands::set_cleanup_api_key,
+            commands::test_cleanup_connection,
             commands::test_microphone,
             commands::get_snippets,
             commands::update_snippets,
@@ -175,6 +180,8 @@ pub fn run() {
             commands::capture_next_key,
             commands::show_settings,
             commands::quit_app,
+            commands::get_dictation_patterns,
+            commands::get_attention_items,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -234,9 +241,13 @@ pub fn run() {
                 let state = handle.state::<SharedState>();
                 let s = state.blocking_lock();
                 let ai_cleanup = s.settings.ai_cleanup;
+                let cleanup_provider = s.settings.cleanup_provider.clone();
                 drop(s);
 
-                let should_start = ai_cleanup && llm::binary_exists() && llm::model_exists();
+                let should_start = ai_cleanup
+                    && cleanup_provider == "local"
+                    && llm::binary_exists()
+                    && llm::model_exists();
 
                 if should_start {
                     let state_clone = handle.state::<SharedState>().inner().clone();

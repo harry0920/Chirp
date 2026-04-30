@@ -4,6 +4,19 @@ import { DEFAULT_SETTINGS, type ErrorType } from '../lib/constants'
 export type AppStatus = 'idle' | 'listening' | 'processing' | 'polishing' | 'done' | 'error'
 export type SttModel = 'parakeet-tdt-0.6b'
 export type HotkeyMode = 'hold' | 'tap'
+export type CleanupProvider = 'local' | 'openai_compatible' | 'anthropic' | 'gemini'
+
+export interface CleanupProviderConfig {
+  model: string
+  baseUrl?: string
+}
+
+export type CleanupProviderConfigs = Record<
+  Exclude<CleanupProvider, 'local'>,
+  CleanupProviderConfig
+>
+
+export type CleanupTestState = 'idle' | 'testing' | 'ok' | 'error'
 
 export interface SnippetEntry {
   trigger: string
@@ -28,6 +41,10 @@ export interface TranscriptionEntry {
   durationMs: number
   speechDurationMs: number
   wasCleanedUp?: boolean
+  /** Raw foreground process name captured at injection time (e.g. "Slack.exe").
+   *  Optional — `null` for entries written before per-app capture shipped, or
+   *  when the platform/permissions blocked the lookup. */
+  targetApp?: string | null
 }
 
 export interface AppState {
@@ -57,6 +74,13 @@ export interface AppState {
   // AI Cleanup
   aiCleanup: boolean
   cleanupModel: string
+  cleanupProvider: CleanupProvider
+  cleanupProviderConfigs: CleanupProviderConfigs
+  /// Per-provider boolean flags reflecting whether a key is saved in the OS
+  /// keychain. Populated lazily from `get_cleanup_api_key`. Never holds the
+  /// key value itself — only true/false.
+  cleanupHasKey: Record<Exclude<CleanupProvider, 'local'>, boolean>
+  cleanupTestStatus: { state: CleanupTestState; message?: string }
   llmReady: boolean
   llmDownloaded: boolean
 
@@ -173,6 +197,10 @@ export const useAppStore = create<AppState>((set) => ({
   // AI Cleanup
   aiCleanup: DEFAULT_SETTINGS.aiCleanup,
   cleanupModel: DEFAULT_SETTINGS.cleanupModel,
+  cleanupProvider: DEFAULT_SETTINGS.cleanupProvider,
+  cleanupProviderConfigs: DEFAULT_SETTINGS.cleanupProviderConfigs,
+  cleanupHasKey: { openai_compatible: false, anthropic: false, gemini: false },
+  cleanupTestStatus: { state: 'idle' },
   llmReady: false,
   llmDownloaded: false,
   llmDownloadProgress: null,
