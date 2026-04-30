@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { trackEvent } from '@aptabase/tauri'
-import { Pencil, Check, X } from 'lucide-react'
+import { Pencil, Check, X, Trash2, Zap } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { Button } from '../shared/Button'
 
@@ -53,24 +53,24 @@ export function SnippetsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5 animate-slide-up">
-      <div className="mb-1">
+    <div className="flex flex-col gap-5">
+      <div className="animate-slide-up stagger-1 mb-1">
         <h1 className="font-geist font-semibold text-2xl text-dm-primary tracking-[-0.02em]">
           Snippets
         </h1>
-        <p className="text-[13px] text-dm-secondary mt-1">
+        <p className="font-geist text-[13px] text-dm-secondary mt-1">
           Voice-triggered text expansion. Say the trigger phrase during dictation and Chirp will replace it with the full text.
         </p>
       </div>
 
       {snippets.length > 0 ? (
-        <div className="overflow-hidden rounded-card border border-card-border">
+        <div className="card-surface animate-slide-up stagger-2 overflow-hidden">
           {/* Header */}
-          <div className="flex bg-card-hover px-[18px] py-2.5">
-            <span className="w-[35%] text-[11px] font-semibold uppercase tracking-[0.5px] text-dm-secondary">
+          <div className="flex bg-white/[0.03] px-[18px] py-2.5">
+            <span className="w-[35%] font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
               Trigger
             </span>
-            <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-dm-secondary">
+            <span className="flex-1 font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45">
               Expands to
             </span>
             <span className="w-20" />
@@ -139,9 +139,9 @@ export function SnippetsPage() {
                     </button>
                     <button
                       onClick={() => removeSnippet(i)}
-                      className="flex h-8 w-8 items-center justify-center text-dm-tertiary hover:text-chirp-error transition-colors duration-150"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-dm-tertiary transition-all duration-150 hover:bg-red-500/10 hover:text-red-400"
                     >
-                      ✕
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </>
@@ -150,15 +150,16 @@ export function SnippetsPage() {
           ))}
         </div>
       ) : (
-        <div className="flex items-center justify-center rounded-card border border-dashed border-card-border bg-card-hover px-6 py-10">
-          <p className="text-[13px] text-dm-secondary text-center">
+        <div className="card-surface animate-slide-up stagger-2 flex flex-col items-center justify-center gap-4 px-6 py-10">
+          <Zap size={28} strokeWidth={1.25} className="text-white/35" />
+          <p className="font-geist text-[13px] text-white/45 text-center">
             No snippets yet. Add trigger phrases that expand into longer text during dictation.
           </p>
         </div>
       )}
 
       {/* Add row */}
-      <div className="card-surface flex flex-col gap-3 p-5">
+      <div className="card-surface animate-slide-up stagger-3 flex flex-col gap-3 p-5">
         <input
           type="text"
           value={newTrigger}
