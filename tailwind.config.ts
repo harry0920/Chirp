@@ -60,6 +60,8 @@ export default {
         display: ['Aptos Display', 'Segoe UI', 'system-ui', 'sans-serif'],
         body: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
         mono: ['Cascadia Mono', 'JetBrains Mono', 'Consolas', 'monospace'],
+        geist: ['"Geist Variable"', 'Segoe UI', 'system-ui', 'sans-serif'],
+        'geist-mono': ['"Geist Mono Variable"', 'JetBrains Mono', 'Consolas', 'monospace'],
       },
       borderRadius: {
         card: '14px',

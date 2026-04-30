@@ -1,3 +1,6 @@
+@import '@fontsource-variable/geist/index.css';
+@import '@fontsource-variable/geist-mono/index.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -153,5 +156,49 @@
     background: linear-gradient(180deg, #FFFFFF 0%, rgba(255,255,255,0.7) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+
+  /* Element-anchored halos for the dark redesign.
+     Soft white radial gradient bloom positioned behind a specific element.
+     Each variant tunes radius and intensity for its host (hero number,
+     brand mark, active dock icon). Render via ::before so the host element
+     can use isolation contexts safely. */
+  .halo-hero {
+    position: relative;
+    isolation: isolate;
+  }
+  .halo-hero::before {
+    content: '';
+    position: absolute;
+    inset: -90px;
+    background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.06) 0%, transparent 60%);
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .halo-mark {
+    position: relative;
+    isolation: isolate;
+  }
+  .halo-mark::before {
+    content: '';
+    position: absolute;
+    inset: -32px;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.05) 0%, transparent 65%);
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .halo-active {
+    position: relative;
+    isolation: isolate;
+  }
+  .halo-active::before {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.07) 0%, transparent 70%);
+    z-index: -1;
+    pointer-events: none;
   }
 }

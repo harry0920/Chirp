@@ -5,6 +5,28 @@ All notable changes to Chirp.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries are dated and reference the commit hash for full diff context.
 
+## [Unreleased]
+
+### 2026-04-30 — UI redesign foundation (Phase 1)
+
+Foundation work for the dark, type-led UI redesign tracked in
+`.claude/plans/we-are-redesigning-chirp-structured-tiger.md`. This phase
+is purely additive and produces no user-visible change yet — existing
+pages keep their current type and tokens.
+
+#### Added
+- Geist Sans + Geist Mono via `@fontsource-variable/geist` and
+  `@fontsource-variable/geist-mono`. Imported in `globals.css`,
+  registered as `font-geist` and `font-geist-mono` in
+  `tailwind.config.ts`.
+- Element-anchored halo utilities (`.halo-hero`, `.halo-mark`,
+  `.halo-active`) — radial-gradient blooms via `::before` for
+  hero numbers, the brand mark, and active dock icons.
+- `Sparkline` primitive at `src/components/shared/Sparkline.tsx` —
+  thin sharp-jagged white SVG polyline (no curves, miter joins) with a
+  single amber dot at the latest data point. Reused across the
+  redesigned Home, overlay, and Settings audio surfaces.
+
 ## [1.3.4] — 2026-04-25
 
 v1.3.0–v1.3.3 were tagged but never shipped: each release uncovered a
