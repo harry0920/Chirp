@@ -7,6 +7,18 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign tray icon (Phase 8)
+
+#### Changed
+- Replaced `src-tauri/icons/tray-icon.png` with a white BirdMark
+  rendered from the canonical SVG path. Matches the new identity (the
+  in-app dock and overlay also render the BirdMark in white). Listens
+  / error state-switching (amber while listening, red on error) is
+  deferred to a follow-up — wiring requires plumbing the TrayIcon
+  handle through Rust state and hooking it from the recording state
+  machine, which is meaningfully more code than the static asset
+  swap and not load-bearing for the redesign milestone.
+
 ### 2026-04-30 — UI redesign onboarding chassis (Phase 7)
 
 #### Changed
