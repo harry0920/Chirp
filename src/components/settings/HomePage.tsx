@@ -135,18 +135,14 @@ export function HomePage() {
   const isEmpty = history.length === 0
 
   return (
-    <div className="relative">
-      <div className="absolute right-0 top-0 z-10">
+    <div className="flex flex-col gap-6">
+      <div className="flex justify-end">
         <ReadinessPill />
       </div>
 
       <div className="flex flex-col gap-10">
         {attention.length > 0 && (
-          // Right padding leaves clearance for the absolutely-positioned
-          // ReadinessPill so the strip never overlaps it.
-          <div className="pr-[280px]">
-            <AttentionStrip items={attention} onAction={handleAttentionAction} />
-          </div>
+          <AttentionStrip items={attention} onAction={handleAttentionAction} />
         )}
 
         <div className="animate-slide-up">
