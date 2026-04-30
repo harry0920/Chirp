@@ -6,10 +6,10 @@ interface Props {
   dismissing: boolean
 }
 
-const BAR_COUNT = 16
+const BAR_COUNT = 8
 // Three evenly-distributed bar indices that stay as dots when the
 // waveform liquid-morphs. Other bars collapse to zero width.
-const DOT_INDICES = [3, 8, 13] as const
+const DOT_INDICES = [2, 4, 6] as const
 
 function ampForBar(amplitudes: number[], i: number): number {
   if (amplitudes.length === 0) return 0.04
