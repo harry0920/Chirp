@@ -6,10 +6,10 @@ interface Props {
   dismissing: boolean
 }
 
-const BAR_COUNT = 16
+const BAR_COUNT = 12
 // Three evenly-distributed bar indices that stay as dots when the
 // waveform liquid-morphs. Other bars collapse to zero width.
-const DOT_INDICES = [3, 8, 13] as const
+const DOT_INDICES = [2, 6, 10] as const
 
 function ampForBar(amplitudes: number[], i: number): number {
   if (amplitudes.length === 0) return 0.04
@@ -34,7 +34,7 @@ export function TransientCanvas({ mode, amplitudes, dismissing }: Props) {
       }`}
       style={{ boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.04)' }}
     >
-      <div className="flex h-6 items-center gap-[3px]">
+      <div className="flex h-6 items-center gap-[5px]">
         {Array.from({ length: BAR_COUNT }).map((_, i) => {
           const dotIdx = DOT_INDICES.indexOf(i as typeof DOT_INDICES[number])
           const isDotPosition = dotIdx >= 0
