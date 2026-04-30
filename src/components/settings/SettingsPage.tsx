@@ -14,6 +14,7 @@ import { Toggle } from '../shared/Toggle'
 import { Select } from '../shared/Select'
 import { KeyBadge } from '../shared/KeyBadge'
 import { Button } from '../shared/Button'
+import { Sparkline } from '../shared/Sparkline'
 import { CleanupStatusBadge } from '../CleanupStatusBadge'
 
 const HOTKEY_MODE_OPTIONS: Array<{ id: HotkeyMode; label: string }> = [
@@ -43,7 +44,7 @@ const CLOUD_PROVIDER_MODEL_PLACEHOLDER: Record<CloudProvider, string> = {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-semibold text-dm-secondary uppercase tracking-[0.8px] mb-2 pl-0.5">
+    <div className="font-geist text-[10px] font-medium uppercase tracking-[0.2em] text-white/45 mb-3 pl-0.5">
       {children}
     </div>
   )
@@ -58,7 +59,7 @@ function Row({
 }) {
   return (
     <div
-      className={`flex items-center justify-between px-[18px] py-[14px] transition-colors hover:bg-card-hover ${
+      className={`flex items-center justify-between px-[18px] py-[14px] transition-colors duration-150 hover:bg-card-hover ${
         last ? '' : 'border-b border-dm-row-sep'
       }`}
     >
@@ -159,7 +160,9 @@ export function SettingsPage() {
   // Audio state
   const [devices, setDevices] = useState<AudioDevice[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
-  const [inputLevel, setInputLevel] = useState(0)
+  // Rolling buffer of the last N input-level samples — drives the
+  // Sparkline visualization that replaces the static scalar bar.
+  const [inputLevelHistory, setInputLevelHistory] = useState<number[]>(() => Array(60).fill(0))
   const [testState, setTestState] = useState<'idle' | 'recording' | 'playing'>('idle')
   const [testCountdown, setTestCountdown] = useState(3)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -198,12 +201,17 @@ export function SettingsPage() {
     tauri.getAudioDevices().then(setDevices).finally(() => setDevicesLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- one-time init
 
-  // Live input level polling (~15fps)
+  // Live input level polling (~15fps). Each sample is also pushed
+  // onto the rolling history that drives the Sparkline visualization.
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const level = await tauri.getInputLevel()
-        setInputLevel(level)
+        setInputLevelHistory((prev) => {
+          const next = prev.slice(1)
+          next.push(level)
+          return next
+        })
       } catch { /* input level polling — device may be unavailable */ }
     }, 67)
     return () => clearInterval(interval)
@@ -661,10 +669,13 @@ export function SettingsPage() {
                   {testLinkText}
                 </button>
               </div>
-              <div className="mt-2 h-[6px] w-full overflow-hidden rounded-full bg-surface">
-                <div
-                  className="h-full rounded-full bg-chirp-success transition-all duration-100"
-                  style={{ width: `${Math.min(100, inputLevel * 100)}%` }}
+              <div className="mt-2 h-[28px] w-full">
+                <Sparkline
+                  data={inputLevelHistory}
+                  strokeWidth={1.25}
+                  dotRadius={2.5}
+                  animateOnMount={false}
+                  className="h-full w-full"
                 />
               </div>
             </div>
@@ -889,12 +900,13 @@ export function SettingsPage() {
                 Currently: {describePosition(store.overlayPosition)}
               </div>
             </div>
-            <Button
+            <button
+              type="button"
               onClick={() => emit('enter-reposition-mode')}
-              variant="secondary"
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 font-geist text-[12px] text-white/85 transition-colors hover:bg-white/[0.07]"
             >
               Reposition
-            </Button>
+            </button>
           </Row>
           <Row>
             <div>
