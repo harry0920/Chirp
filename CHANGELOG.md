@@ -7,6 +7,43 @@ Entries are dated and reference the commit hash for full diff context.
 
 ## [Unreleased]
 
+### 2026-04-30 — UI redesign Home page rebuild (Phase 4)
+
+#### Changed
+- Rewrote `src/components/settings/HomePage.tsx` as a dictation
+  analytics surface. Replaces the previous greeting + stats grid + dual
+  history/quick-add layout with a focused three-tier composition:
+  hero → patterns row → recents (or Test Dictation card on day 0).
+  Pulls live data from the new `get_dictation_patterns` and
+  `get_attention_items` commands; refetches when the period toggle or
+  history length changes.
+
+#### Added
+- `src/components/home/HeroMetric.tsx` — giant Geist 600 word count
+  with tabular nums + the sparkline primitive + period toggle
+  (`week · month · year · all`). White halo behind the number.
+- `src/components/home/PatternsRow.tsx` — three-column grid
+  containing:
+    - `WhenYouDictate.tsx` — 7×24 day-of-week × hour heatmap, white-fill
+      saturation maps to dictation volume.
+    - `WhereYouDictate.tsx` — top-5 apps with thin bars and an amber
+      dot on the leading app, percentages in Geist Mono.
+    - `WhatYouSay.tsx` — three stat lines (avg words per session,
+      longest dictation, time spoken).
+- `src/components/home/RecentsRow.tsx` — three most-recent dictations
+  with timestamp, preview text, app context, copy/delete on hover.
+- `src/components/home/ReadinessPill.tsx` — top-right glass pill with
+  green/amber/red dot, hotkey badges, and a flyout listing mic,
+  speech-model, and cleanup status.
+- `src/components/home/AttentionStrip.tsx` — slim amber-bordered strip
+  surfaced only when the backend reports actionable items; clickable
+  inline links route to the relevant settings/page.
+- `src/components/home/TestDictationCard.tsx` — day-0 fallback that
+  shows the user's hotkey and a brief "stats appear here" line in
+  place of the recents list.
+- `src/components/home/types.ts` — shared TS types mirroring the
+  Rust analytics structs.
+
 ### 2026-04-30 — UI redesign per-app context + analytics (Phase 3)
 
 #### Added
