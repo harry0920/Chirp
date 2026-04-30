@@ -1780,37 +1780,14 @@ pub struct AttentionItem {
 /// Items to surface on the Home page's Attention strip. Returns an empty
 /// list when nothing needs the user's eye — silence is healthy.
 ///
-/// Currently a stub that derives suggestions from history alone (e.g. recent
-/// dictation runs without an associated foreground app, which often signals
-/// an injection-permissions issue). Expanded in later phases as we add
-/// permission-state, mic-change, and misheard-word detection.
+/// Reserved for future signals (permission-state changes, mic device
+/// changes, misheard-word suggestions). The previous "missing target_app"
+/// heuristic was removed because it produced false positives for legacy
+/// history entries written before per-app capture shipped, and on Windows
+/// it surfaced macOS-specific accessibility advice.
 #[tauri::command]
 pub async fn get_attention_items(
-    state: State<'_, SharedState>,
+    _state: State<'_, SharedState>,
 ) -> Result<Vec<AttentionItem>, String> {
-    let s = state.lock().await;
-    let mut items: Vec<AttentionItem> = Vec::new();
-
-    // Recent (last 24h) entries that completed transcription but had no
-    // captured foreground app — strong signal that injection or app-capture
-    // hit a permissions issue. Capped so we don't flood the strip on a fresh
-    // install when target_app is `None` for every legacy entry.
-    let cutoff = (chrono::Utc::now() - chrono::Duration::hours(24)).to_rfc3339();
-    let missing = s
-        .history
-        .iter()
-        .filter(|e| e.timestamp >= cutoff && e.target_app.is_none())
-        .count();
-    if missing >= 3 {
-        items.push(AttentionItem {
-            id: "missing-target-app".into(),
-            severity: AttentionSeverity::Warning,
-            message: format!(
-                "{missing} recent dictations had no detected target app. Check accessibility permissions."
-            ),
-            action: Some("settings:permissions".into()),
-        });
-    }
-
-    Ok(items)
+    Ok(Vec::new())
 }

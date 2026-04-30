@@ -142,7 +142,11 @@ export function HomePage() {
 
       <div className="flex flex-col gap-10">
         {attention.length > 0 && (
-          <AttentionStrip items={attention} onAction={handleAttentionAction} />
+          // Right padding leaves clearance for the absolutely-positioned
+          // ReadinessPill so the strip never overlaps it.
+          <div className="pr-[280px]">
+            <AttentionStrip items={attention} onAction={handleAttentionAction} />
+          </div>
         )}
 
         <div className="animate-slide-up">
