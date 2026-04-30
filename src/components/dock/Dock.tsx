@@ -31,7 +31,7 @@ export function Dock() {
           type="button"
           onClick={() => setSettingsPage('home')}
           aria-label="chirp"
-          className="halo-mark relative flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 hover:bg-white/[0.04]"
+          className="halo-mark group relative flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 active:scale-95 hover:bg-white/[0.04]"
         >
           <BirdMark size={18} color="#FFFFFF" />
         </button>
@@ -48,13 +48,17 @@ export function Dock() {
               aria-label={label}
               aria-current={active ? 'page' : undefined}
               title={label}
-              className={`relative flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 ${
+              className={`group relative flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 active:scale-95 ${
                 active
                   ? 'halo-active bg-white/[0.06] text-white'
                   : 'text-white/45 hover:bg-white/[0.04] hover:text-white/85'
               }`}
             >
-              <Icon size={18} strokeWidth={1.75} />
+              <Icon
+                size={18}
+                strokeWidth={1.75}
+                className="transition-transform duration-200 group-hover:scale-110"
+              />
             </button>
           )
         })}
