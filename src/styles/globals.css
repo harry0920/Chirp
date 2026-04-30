@@ -176,9 +176,11 @@
     border-radius: 14px;
   }
 
-  /* Transient overlay's polish/error dot pulse */
+  /* Transient overlay's polish/error dot pulse — gentle breath since
+     these dots emerge from a morph and we don't want them to feel
+     jumpy. 0.6 → 1 with a small scale lift reads as soft pulsing. */
   @keyframes overlay-dot-pulse {
-    0%, 100% { opacity: 0.45; transform: scale(0.85); }
+    0%, 100% { opacity: 0.6; transform: scale(0.9); }
     50% { opacity: 1; transform: scale(1); }
   }
 
