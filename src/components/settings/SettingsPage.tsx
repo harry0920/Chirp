@@ -772,8 +772,8 @@ export function SettingsPage() {
         <Card>
           <Row>
             <div>
-              <div className="text-[13px] font-medium text-dm-primary">Smart formatting</div>
-              <div className="text-[11px] text-dm-secondary mt-0.5">Automatically format lists, paragraphs, and structure</div>
+              <div className="text-[13px] font-medium text-dm-primary">Quick formatting</div>
+              <div className="text-[11px] text-dm-secondary mt-0.5">Remove filler words and convert spoken punctuation</div>
             </div>
             <Toggle
               checked={store.smartFormatting}
