@@ -41,6 +41,20 @@ pub fn model_exists(model: &str) -> bool {
     dir.join("tokens.txt").exists()
 }
 
+/// Delete a speech model directory from disk. Idempotent — returns
+/// Ok(()) when the directory doesn't exist. The caller is responsible
+/// for dropping any in-memory recognizer that referenced this model.
+pub fn delete_model(model: &str) -> Result<(), String> {
+    let dir = model_dir(model);
+    if !dir.exists() {
+        return Ok(());
+    }
+    std::fs::remove_dir_all(&dir)
+        .map_err(|e| format!("Failed to delete speech model: {e}"))?;
+    log::info!("Speech model deleted from {}", dir.display());
+    Ok(())
+}
+
 /// Load a sherpa-onnx offline recognizer from disk.
 ///
 /// `vocabulary` is the user's hotword list — proper nouns, technical terms,

@@ -73,14 +73,10 @@ pub struct Settings {
     pub help_improve: bool,
     #[serde(default)]
     pub beam_search: bool,
-    #[serde(default = "default_cleanup_model")]
-    pub cleanup_model: String,
     #[serde(default = "default_cleanup_provider")]
     pub cleanup_provider: String,
     #[serde(default = "default_cleanup_provider_configs")]
     pub cleanup_provider_configs: HashMap<String, CleanupProviderConfig>,
-    #[serde(default)]
-    pub dark_mode: bool,
 }
 
 /// Per-provider cleanup config. Keys (API keys) are NOT stored here — they
@@ -98,10 +94,6 @@ pub const OPENAI_COMPATIBLE_DEFAULT_BASE_URL: &str = "https://api.openai.com/v1"
 pub const OPENAI_COMPATIBLE_DEFAULT_MODEL: &str = "gpt-4.1-mini";
 pub const ANTHROPIC_DEFAULT_MODEL: &str = "claude-haiku-4-5";
 pub const GEMINI_DEFAULT_MODEL: &str = "gemini-2.5-flash";
-
-fn default_cleanup_model() -> String {
-    "chirp-v2".into()
-}
 
 fn default_cleanup_provider() -> String {
     "local".into()
@@ -159,10 +151,8 @@ impl Default for Settings {
             history_retention_days: 0,
             help_improve: false,
             beam_search: false,
-            cleanup_model: "chirp-v2".into(),
             cleanup_provider: "local".into(),
             cleanup_provider_configs: default_cleanup_provider_configs(),
-            dark_mode: false,
         }
     }
 }

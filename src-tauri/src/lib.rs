@@ -2,6 +2,7 @@ mod announcements;
 mod app_names;
 mod audio;
 mod cleanup;
+mod cloud_prompts;
 mod commands;
 mod feedback;
 mod history;
@@ -182,6 +183,8 @@ pub fn run() {
             commands::quit_app,
             commands::get_dictation_patterns,
             commands::get_attention_items,
+            commands::delete_speech_model,
+            commands::delete_llm_model,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

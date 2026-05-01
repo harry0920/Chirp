@@ -10,10 +10,10 @@ const SYNCED_KEYS = [
   'hotkey', 'hotkeyMode', 'launchAtLogin', 'playSoundOnComplete',
   'autoDismissOverlay', 'smartFormatting',
   'inputDevice', 'model', 'onboardingComplete',
-  'aiCleanup', 'cleanupModel', 'cleanupProvider',
+  'aiCleanup', 'cleanupProvider',
   'beamSearch', 'toneMode',
   'overlayPosition',
-  'historyRetentionDays', 'helpImprove', 'darkMode',
+  'historyRetentionDays', 'helpImprove',
 ] as const
 
 function isIpcNotReady(err: unknown): boolean {

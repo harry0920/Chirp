@@ -182,6 +182,14 @@ function createTauriApi() {
     }
   }
 
+  const deleteSpeechModel = async (model: string): Promise<void> => {
+    await invoke('delete_speech_model', { model })
+  }
+
+  const deleteLlmModel = async (): Promise<void> => {
+    await invoke('delete_llm_model')
+  }
+
   return {
     startRecording,
     stopRecording,
@@ -206,5 +214,7 @@ function createTauriApi() {
     getHotkeyStatus,
     testMicrophone,
     checkForUpdates,
+    deleteSpeechModel,
+    deleteLlmModel,
   }
 }

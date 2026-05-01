@@ -73,7 +73,6 @@ export interface AppState {
 
   // AI Cleanup
   aiCleanup: boolean
-  cleanupModel: string
   cleanupProvider: CleanupProvider
   cleanupProviderConfigs: CleanupProviderConfigs
   /// Per-provider boolean flags reflecting whether a key is saved in the OS
@@ -105,13 +104,9 @@ export interface AppState {
 
   // Overlay
   overlayPosition: string | { x: number; y: number }
-  repositionMode: boolean
 
   // History retention
   historyRetentionDays: number
-
-  // Appearance
-  darkMode: boolean
 
   // Telemetry
   helpImprove: boolean
@@ -166,7 +161,6 @@ export interface AppState {
   setAboutModalOpen: (open: boolean) => void
   setUpgradeModalOpen: (open: boolean) => void
   setUpdateAvailable: (version: string | null) => void
-  setRepositionMode: (mode: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -195,7 +189,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   // AI Cleanup
   aiCleanup: DEFAULT_SETTINGS.aiCleanup,
-  cleanupModel: DEFAULT_SETTINGS.cleanupModel,
   cleanupProvider: DEFAULT_SETTINGS.cleanupProvider,
   cleanupProviderConfigs: DEFAULT_SETTINGS.cleanupProviderConfigs,
   cleanupHasKey: { openai_compatible: false, anthropic: false, gemini: false },
@@ -224,13 +217,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   // Overlay
   overlayPosition: DEFAULT_SETTINGS.overlayPosition,
-  repositionMode: false,
 
   // History retention
   historyRetentionDays: DEFAULT_SETTINGS.historyRetentionDays,
-
-  // Appearance
-  darkMode: DEFAULT_SETTINGS.darkMode,
 
   // Telemetry
   helpImprove: DEFAULT_SETTINGS.helpImprove,
@@ -296,5 +285,4 @@ export const useAppStore = create<AppState>((set) => ({
   setAboutModalOpen: (aboutModalOpen) => set({ aboutModalOpen }),
   setUpgradeModalOpen: (upgradeModalOpen) => set({ upgradeModalOpen }),
   setUpdateAvailable: (updateAvailable) => set({ updateAvailable }),
-  setRepositionMode: (repositionMode) => set({ repositionMode }),
 }))

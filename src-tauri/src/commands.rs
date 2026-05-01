@@ -817,6 +817,26 @@ pub async fn stop_recording(
         let mut vc = vad_cleaned.0.lock().unwrap_or_else(|e| e.into_inner());
         std::mem::take(&mut *vc)
     };
+
+    // Decide pre-join whether the LLM cleanup pass will run after this. When
+    // it will, the join can strip Parakeet's per-segment periods and
+    // mid-thought capitalization so the LLM sees a clean joined utterance.
+    // Otherwise we use the conservative join (no strip, no lowercase) since
+    // there's no LLM to recapitalize proper nouns or re-add real periods.
+    //
+    // Word count comes from the un-joined segments — an upper bound on the
+    // post-cleanup count, but close enough. The aggressive helper is a
+    // no-op when there's only one segment, which is the typical short-
+    // message case, so any imprecision here doesn't affect behavior.
+    let pre_total_words: usize = vad_cleaned_texts
+        .iter()
+        .map(|s| s.split_whitespace().count())
+        .sum();
+    let will_skip_short_for_join =
+        tone_mode != "email" && pre_total_words < MIN_AI_CLEANUP_WORDS;
+    let ai_cleanup_pending =
+        ai_cleanup && cleanup_backend.is_some() && !will_skip_short_for_join;
+
     let use_vad = vad_was_active;
     log::info!(
         "transcription path: vad_was_active={}, vad_texts_count={}, vad_cleaned_count={}, fallback_used={}",
@@ -839,7 +859,11 @@ pub async fn stop_recording(
         // segments with their continuation, drop internal paragraph breaks,
         // and re-run the regex pre-pass on the joined output to catch
         // cross-boundary fillers. See cleanup::join_cleaned_segments_with_formatting.
-        let joined = cleanup::join_cleaned_segments_with_formatting(&vad_cleaned_texts, smart_fmt);
+        let joined = cleanup::join_cleaned_segments_with_formatting(
+            &vad_cleaned_texts,
+            smart_fmt,
+            ai_cleanup_pending,
+        );
         if joined.trim().is_empty() {
             log::warn!(
                 "VAD cleaned transcripts all whitespace after join — returning empty result"
@@ -1321,6 +1345,45 @@ pub async fn download_llm(
 ) -> Result<(), String> {
     llm::download_binary(&app_handle).await?;
     llm::download_model(&app_handle).await?;
+    Ok(())
+}
+
+/// Delete the cleanup model GGUF from disk. If the LLM server is running
+/// it gets stopped first and AI cleanup is disabled in settings — the
+/// frontend can re-enable it after a fresh download.
+#[tauri::command]
+pub async fn delete_llm_model(
+    state: State<'_, SharedState>,
+) -> Result<(), String> {
+    let mut s = state.lock().await;
+    if let Some(mut child) = s.llm_process.take() {
+        llm::stop_server(&mut child).await;
+        s.llm_port = None;
+    }
+    llm::clear_server_pid();
+    s.settings.ai_cleanup = false;
+    drop(s);
+    llm::delete_model()?;
+    Ok(())
+}
+
+/// Delete a speech model directory from disk. Drops the in-memory
+/// recognizer if it referenced this model so the next dictation
+/// surfaces a clear "model needed" error rather than crashing.
+#[tauri::command]
+pub async fn delete_speech_model(
+    state: State<'_, SharedState>,
+    model: String,
+) -> Result<(), String> {
+    let mut s = state.lock().await;
+    if s.settings.model == model {
+        // Drop the recognizer Arc — sherpa-onnx will be re-loaded only
+        // when the model is re-downloaded and start_recording fires
+        // the lazy rebuild path.
+        s.recognizer = None;
+    }
+    drop(s);
+    transcribe::delete_model(&model)?;
     Ok(())
 }
 

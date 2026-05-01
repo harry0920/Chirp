@@ -11,7 +11,6 @@ const SYNCED_KEYS = [
   'autoDismissOverlay', 'smartFormatting',
   'inputDevice', 'model', 'onboardingComplete',
   'aiCleanup',
-  'cleanupModel',
   'cleanupProvider',
   'cleanupProviderConfigs',
   'beamSearch',
@@ -19,7 +18,6 @@ const SYNCED_KEYS = [
   'overlayPosition',
   'historyRetentionDays',
   'helpImprove',
-  'darkMode',
 ] as const
 
 /**

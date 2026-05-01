@@ -258,6 +258,45 @@ fn looks_like_instruction_leak(input: &str, output: &str) -> bool {
     absent_instruction_phrases >= 2
 }
 
+fn parse_cleanup_response(body: &serde_json::Value, fallback: &str) -> String {
+    let raw_content = body["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or(fallback)
+        .trim();
+
+    let result = if let Ok(json) = serde_json::from_str::<serde_json::Value>(raw_content) {
+        json["cleaned_text"]
+            .as_str()
+            .unwrap_or(fallback)
+            .trim()
+            .to_string()
+    } else {
+        raw_content.to_string()
+    };
+
+    undatamark(&result)
+}
+
+fn guard_cleanup_result(input: &str, result: String) -> String {
+    if looks_like_instruction_leak(input, &result) {
+        log::warn!("Cleanup output looked like internal instruction text, using original");
+        return input.to_string();
+    }
+
+    // Sanity check: if output is much longer than input, the LLM likely
+    // followed the text as an instruction instead of cleaning it.
+    let input_words = input.split_whitespace().count();
+    let output_words = result.split_whitespace().count();
+    if output_words > input_words * 3 / 2 + 10 {
+        log::warn!(
+            "Cleanup output ({output_words} words) much longer than input ({input_words} words), using original"
+        );
+        return input.to_string();
+    }
+
+    result
+}
+
 // Qwen 3 1.7B Instruct (Alibaba, Apache 2.0). Half the disk of Qwen 2.5 3B
 // (~1.1 GB vs 2.1 GB) and roughly 2× inference speed on the same hardware.
 // Thinking mode is disabled at the server level via --reasoning-budget 0 so
@@ -329,6 +368,20 @@ pub fn binary_exists() -> bool {
 /// Check if the model GGUF exists
 pub fn model_exists() -> bool {
     model_path().exists()
+}
+
+/// Delete the cleanup model GGUF from disk. The llama-server binary,
+/// version marker, and PID file are left in place — the binary is a
+/// shared dependency and re-downloading the model is faster when the
+/// runtime stays installed.
+pub fn delete_model() -> Result<(), String> {
+    let path = model_path();
+    if !path.exists() {
+        return Ok(());
+    }
+    std::fs::remove_file(&path).map_err(|e| format!("Failed to delete cleanup model: {e}"))?;
+    log::info!("Cleanup model deleted from {}", path.display());
+    Ok(())
 }
 
 /// Download llama-server binary from llama.cpp releases
@@ -667,97 +720,421 @@ pub async fn stop_server(child: &mut tokio::process::Child) {
     log::info!("llama-server stopped");
 }
 
-/// Send text through the LLM for cleanup
+/// Cleanup backend selector. The unified `cleanup_text` entry point dispatches
+/// on this. Each variant carries everything needed to make a single request.
+pub enum CleanupBackend {
+    /// Local llama-server (llama.cpp) on `127.0.0.1:port` using OpenAI-compatible chat completions.
+    Local { port: u16 },
+    /// Any OpenAI-compatible Chat Completions endpoint (OpenAI itself, Groq,
+    /// OpenRouter, Together, DeepSeek, Mistral, Ollama, LM Studio…).
+    OpenAICompatible {
+        base_url: String,
+        api_key: String,
+        model: String,
+    },
+    /// Anthropic native /v1/messages endpoint (Claude).
+    Anthropic { api_key: String, model: String },
+    /// Google Gemini native generateContent endpoint.
+    Gemini { api_key: String, model: String },
+}
+
+/// Per-cleanup-call timeout. Tighter than the shared 30s client timeout so a
+/// hanging cloud provider doesn't block the user's hotkey-to-paste latency.
+const CLEANUP_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+fn estimate_max_tokens(text: &str) -> usize {
+    let input_tokens_est = (text.split_whitespace().count() as f64 * 1.3) as usize;
+    (input_tokens_est * 2).clamp(64, 1024)
+}
+
+/// Pull the most useful error string out of a non-2xx response body. Tries
+/// the common provider error shapes (`error.message`, `error`, `message`) and
+/// falls back to the raw body if none match.
+fn extract_error_message(body: &str) -> String {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+        if let Some(msg) = v.pointer("/error/message").and_then(|m| m.as_str()) {
+            return msg.to_string();
+        }
+        if let Some(msg) = v.get("error").and_then(|m| m.as_str()) {
+            return msg.to_string();
+        }
+        if let Some(msg) = v.get("message").and_then(|m| m.as_str()) {
+            return msg.to_string();
+        }
+    }
+    body.chars().take(300).collect()
+}
+
+/// Build the JSON schema we want every provider to honour (single string
+/// field `cleaned_text`).
+fn cleaned_text_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": { "cleaned_text": { "type": "string" } },
+        "required": ["cleaned_text"],
+        "additionalProperties": false
+    })
+}
+
+/// Wrap the user's text with the transcription tags + datamarking so all
+/// backends share the exact same input shape.
+fn user_message(text: &str) -> String {
+    format!("<transcription>\n{}\n</transcription>", datamark(text))
+}
+
+/// Unified cleanup entry point. Dispatches to the correct backend.
+///
+/// Local uses the short `system_prompt_for_mode` tuned for Qwen 3 1.7B. Cloud
+/// providers use the longer cloud prompt (`cloud_prompts::cloud_full_prompt`)
+/// which crosses the per-provider cache threshold and unlocks ~10–50% input
+/// cost savings + 25–60% TTFT reductions on subsequent dictations.
 pub async fn cleanup_text(
-    port: u16,
+    backend: CleanupBackend,
     text: &str,
     tone_mode: &str,
     client: &reqwest::Client,
 ) -> Result<String, String> {
-    let prompt = system_prompt_for_mode(tone_mode);
-    let input_tokens_est = (text.split_whitespace().count() as f64 * 1.3) as usize;
-    let max_tokens = (input_tokens_est * 2).clamp(64, 1024);
+    let max_tokens = estimate_max_tokens(text);
+    let marked_user = user_message(text);
 
-    // Datamark the input: insert ^ between words to prevent instruction-following
-    let marked_text = datamark(text);
+    let cleaned = match backend {
+        CleanupBackend::Local { port } => {
+            // Short prompt only — Qwen 3 1.7B is tuned around the existing
+            // wording and a longer prompt slows it down with no quality gain.
+            let local_prompt = system_prompt_for_mode(tone_mode);
+            cleanup_via_openai_compat(
+                client,
+                &format!("http://127.0.0.1:{port}/v1/chat/completions"),
+                None,
+                "qwen3",
+                &local_prompt,
+                &marked_user,
+                max_tokens,
+                LocalSchemaShape::LlamaCpp,
+                None,
+            )
+            .await?
+        }
+        CleanupBackend::OpenAICompatible {
+            base_url,
+            api_key,
+            model,
+        } => {
+            let api_key = api_key.trim();
+            if api_key.is_empty() {
+                return Err("API key is not configured for this provider".to_string());
+            }
+            let model = if model.trim().is_empty() {
+                crate::state::OPENAI_COMPATIBLE_DEFAULT_MODEL
+            } else {
+                model.trim()
+            };
+            let base = base_url.trim().trim_end_matches('/');
+            let base = if base.is_empty() {
+                crate::state::OPENAI_COMPATIBLE_DEFAULT_BASE_URL
+            } else {
+                base
+            };
+            let url = format!("{base}/chat/completions");
+            // OpenAI-compatible auto-caches prefixes ≥1024 tokens on OpenAI
+            // proper; the cache_key improves routing. Other compat providers
+            // (Groq/OpenRouter/Ollama) ignore the unknown field.
+            let cloud_prompt = crate::cloud_prompts::cloud_full_prompt(tone_mode);
+            let cache_key = crate::cloud_prompts::openai_cache_key(tone_mode);
+            cleanup_via_openai_compat(
+                client,
+                &url,
+                Some(api_key),
+                model,
+                &cloud_prompt,
+                &marked_user,
+                max_tokens,
+                LocalSchemaShape::OpenAiSpec,
+                Some(&cache_key),
+            )
+            .await?
+        }
+        CleanupBackend::Anthropic { api_key, model } => {
+            cleanup_via_anthropic(client, &api_key, &model, tone_mode, &marked_user, max_tokens)
+                .await?
+        }
+        CleanupBackend::Gemini { api_key, model } => {
+            // Gemini 2.5-flash auto-caches prefixes ≥1024 tokens (implicit).
+            let cloud_prompt = crate::cloud_prompts::cloud_full_prompt(tone_mode);
+            cleanup_via_gemini(client, &api_key, &model, &cloud_prompt, &marked_user, max_tokens)
+                .await?
+        }
+    };
 
-    let payload = serde_json::json!({
-        "model": "qwen3",
+    Ok(guard_cleanup_result(text, cleaned))
+}
+
+#[derive(Copy, Clone)]
+enum LocalSchemaShape {
+    /// llama.cpp's `response_format: {type: "json_object", schema: {...}}` extension.
+    LlamaCpp,
+    /// OpenAI structured outputs: `response_format: {type: "json_schema", json_schema: {...}, strict: true}`.
+    OpenAiSpec,
+}
+
+async fn cleanup_via_openai_compat(
+    client: &reqwest::Client,
+    url: &str,
+    api_key: Option<&str>,
+    model: &str,
+    prompt: &str,
+    marked_user: &str,
+    max_tokens: usize,
+    schema_shape: LocalSchemaShape,
+    cache_key: Option<&str>,
+) -> Result<String, String> {
+    let response_format = match schema_shape {
+        LocalSchemaShape::LlamaCpp => serde_json::json!({
+            "type": "json_object",
+            "schema": cleaned_text_schema()
+        }),
+        LocalSchemaShape::OpenAiSpec => serde_json::json!({
+            "type": "json_schema",
+            "json_schema": {
+                "name": "cleaned_text_response",
+                "schema": cleaned_text_schema(),
+                "strict": true
+            }
+        }),
+    };
+
+    let mut payload = serde_json::json!({
+        "model": model,
         "messages": [
             {"role": "system", "content": prompt},
-            {"role": "user", "content": format!("<transcription>\n{}\n</transcription>", marked_text)},
+            {"role": "user", "content": marked_user},
         ],
         "temperature": 0.0,
         "max_tokens": max_tokens,
         "stream": false,
-        "response_format": {
-            "type": "json_object",
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "cleaned_text": {
-                        "type": "string"
-                    }
-                },
-                "required": ["cleaned_text"]
-            }
-        },
+        "response_format": response_format,
     });
+    if let Some(key) = cache_key {
+        // OpenAI-only field. Other OpenAI-compatible providers (Groq,
+        // OpenRouter, Ollama, etc.) ignore unknown fields, so this is safe
+        // to send unconditionally to the OpenAI-compatible arm.
+        payload["prompt_cache_key"] = serde_json::Value::String(key.to_string());
+    }
 
-    let resp = client
-        .post(format!("http://127.0.0.1:{port}/v1/chat/completions"))
-        .json(&payload)
+    let mut req = client.post(url).timeout(CLEANUP_REQUEST_TIMEOUT).json(&payload);
+    if let Some(key) = api_key {
+        req = req.bearer_auth(key);
+    }
+    let resp = req
         .send()
         .await
-        .map_err(|e| format!("LLM request failed: {e}"))?;
+        .map_err(|e| format!("Cleanup request failed: {e}"))?;
 
     if !resp.status().is_success() {
-        return Err(format!("LLM returned status: {}", resp.status()));
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        return Err(format!(
+            "Cleanup request failed ({status}): {}",
+            extract_error_message(&body_text)
+        ));
     }
 
     let body: serde_json::Value = resp
         .json()
         .await
-        .map_err(|e| format!("Failed to parse LLM response: {e}"))?;
+        .map_err(|e| format!("Failed to parse cleanup response: {e}"))?;
 
-    // Extract from JSON schema response or fall back to raw content
-    let raw_content = body["choices"][0]["message"]["content"]
-        .as_str()
-        .unwrap_or(text)
-        .trim();
+    let cleaned = parse_cleanup_response(&body, "");
+    if cleaned.trim().is_empty() {
+        return Err("Cleanup response was empty or malformed".to_string());
+    }
+    Ok(cleaned)
+}
 
-    // Try parsing as JSON (structured output from response_format)
-    let result = if let Ok(json) = serde_json::from_str::<serde_json::Value>(raw_content) {
-        json["cleaned_text"]
-            .as_str()
-            .unwrap_or(text)
-            .trim()
-            .to_string()
+async fn cleanup_via_anthropic(
+    client: &reqwest::Client,
+    api_key: &str,
+    model: &str,
+    tone_mode: &str,
+    marked_user: &str,
+    max_tokens: usize,
+) -> Result<String, String> {
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err("Anthropic API key is not configured".to_string());
+    }
+    let model = if model.trim().is_empty() {
+        crate::state::ANTHROPIC_DEFAULT_MODEL
     } else {
-        // Fallback: treat as plain text
-        raw_content.to_string()
+        model.trim()
     };
 
-    // Remove any leftover datamarking carets
-    let result = undatamark(&result);
+    // System message is split into two blocks so the shared rules+examples
+    // are cached (cache_control: ephemeral, 5 min TTL) while the tone-specific
+    // suffix is appended without invalidating the cache when the user
+    // switches between message and email mode.
+    let (shared, suffix) = crate::cloud_prompts::cloud_prompt_blocks(tone_mode);
+    let system_blocks = serde_json::json!([
+        {
+            "type": "text",
+            "text": shared,
+            "cache_control": {"type": "ephemeral"}
+        },
+        {
+            "type": "text",
+            "text": suffix
+        }
+    ]);
 
-    if looks_like_instruction_leak(text, &result) {
-        log::warn!("Cleanup output looked like internal instruction text, using original");
-        return Ok(text.to_string());
+    // Force structured output via single-tool tool-use. Claude returns the
+    // arguments in `content[*].input` of type `tool_use`.
+    let payload = serde_json::json!({
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": 0.0,
+        "system": system_blocks,
+        "messages": [
+            {"role": "user", "content": marked_user},
+        ],
+        "tools": [{
+            "name": "return_cleaned_text",
+            "description": "Return the cleaned-up dictation text.",
+            "input_schema": cleaned_text_schema()
+        }],
+        "tool_choice": {"type": "tool", "name": "return_cleaned_text"}
+    });
+
+    let resp = client
+        .post("https://api.anthropic.com/v1/messages")
+        .timeout(CLEANUP_REQUEST_TIMEOUT)
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Anthropic cleanup request failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        return Err(format!(
+            "Anthropic cleanup failed ({status}): {}",
+            extract_error_message(&body_text)
+        ));
     }
 
-    // Sanity check: if output is much longer than input, the LLM likely
-    // followed the text as an instruction instead of cleaning it
-    let input_words = text.split_whitespace().count();
-    let output_words = result.split_whitespace().count();
-    if output_words > input_words * 3 / 2 + 10 {
-        log::warn!(
-            "Cleanup output ({output_words} words) much longer than input ({input_words} words), using original"
-        );
-        return Ok(text.to_string());
-    }
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse Anthropic response: {e}"))?;
 
+    let cleaned = body
+        .get("content")
+        .and_then(|c| c.as_array())
+        .and_then(|arr| {
+            arr.iter().find_map(|block| {
+                if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                    block
+                        .pointer("/input/cleaned_text")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+        });
+
+    let result = match cleaned {
+        Some(s) => undatamark(s.trim()),
+        None => return Err("Anthropic response did not include cleaned_text".to_string()),
+    };
     Ok(result)
+}
+
+async fn cleanup_via_gemini(
+    client: &reqwest::Client,
+    api_key: &str,
+    model: &str,
+    prompt: &str,
+    marked_user: &str,
+    max_tokens: usize,
+) -> Result<String, String> {
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err("Gemini API key is not configured".to_string());
+    }
+    let model = if model.trim().is_empty() {
+        crate::state::GEMINI_DEFAULT_MODEL
+    } else {
+        model.trim()
+    };
+
+    let payload = serde_json::json!({
+        "systemInstruction": {
+            "parts": [{"text": prompt}]
+        },
+        "contents": [{
+            "role": "user",
+            "parts": [{"text": marked_user}]
+        }],
+        "generationConfig": {
+            "temperature": 0.0,
+            "maxOutputTokens": max_tokens,
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "object",
+                "properties": {"cleaned_text": {"type": "string"}},
+                "required": ["cleaned_text"]
+            }
+        }
+    });
+
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    );
+    let resp = client
+        .post(&url)
+        .timeout(CLEANUP_REQUEST_TIMEOUT)
+        .header("x-goog-api-key", api_key)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Gemini cleanup request failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        return Err(format!(
+            "Gemini cleanup failed ({status}): {}",
+            extract_error_message(&body_text)
+        ));
+    }
+
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse Gemini response: {e}"))?;
+
+    let raw_text = body
+        .pointer("/candidates/0/content/parts/0/text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+
+    if raw_text.is_empty() {
+        return Err("Gemini response was empty".to_string());
+    }
+
+    let cleaned = match serde_json::from_str::<serde_json::Value>(raw_text) {
+        Ok(json) => json
+            .get("cleaned_text")
+            .and_then(|v| v.as_str())
+            .unwrap_or(raw_text)
+            .to_string(),
+        Err(_) => raw_text.to_string(),
+    };
+
+    Ok(undatamark(cleaned.trim()))
 }
 
 #[cfg(test)]

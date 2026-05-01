@@ -1,4 +1,8 @@
-use crate::state::{Settings, SnippetEntry};
+use crate::secrets;
+use crate::state::{
+    default_cleanup_provider_configs, Settings, SnippetEntry,
+    OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
+};
 use std::path::PathBuf;
 
 /// Migrate old Tauri shortcut format (e.g., "CmdOrCtrl+Shift+Space") to new
@@ -122,48 +126,134 @@ fn cleanup_old_models() {
     }
 }
 
-/// Load settings from disk, returning defaults if file doesn't exist
+/// Load settings from disk, returning defaults if file doesn't exist.
+/// Migrations are accumulated and saved once at the end if anything changed.
 pub fn load_settings() -> Settings {
     let path = settings_path();
-    let mut settings = match std::fs::read_to_string(&path) {
-        Ok(data) => serde_json::from_str(&data).unwrap_or_else(|e| {
+    let raw_json: Option<serde_json::Value> = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|data| serde_json::from_str(&data).ok());
+
+    let mut settings = match raw_json.as_ref() {
+        Some(value) => serde_json::from_value(value.clone()).unwrap_or_else(|e| {
             log::warn!("Corrupted settings JSON, using defaults: {e}");
             Settings::default()
         }),
-        Err(_) => Settings::default(),
+        None => Settings::default(),
     };
+
+    let mut dirty = false;
 
     // Migrate any non-current model identifier to the current default
     // (Parakeet). Covers whisper tiny/base/small/medium and the shelved
-    // Moonshine experiment (moonshine-base, medium-streaming-en, etc.).
-    // Parakeet is the only supported ASR today; transcribe::model_info falls
-    // back to Parakeet for unknown ids anyway, but the stale string was
-    // leaking into log lines and the settings UI.
+    // Moonshine experiment.
     if settings.model != "parakeet-tdt-0.6b" {
         log::info!("Migrated model '{}' → 'parakeet-tdt-0.6b'", settings.model);
         settings.model = "parakeet-tdt-0.6b".into();
-        let _ = save_settings(&settings);
+        dirty = true;
     }
 
-    // Force the cleanup_model identifier to "chirp-v2" — the only value the
-    // app currently understands. The actual model bytes are Qwen 3 1.7B
-    // (see llm::MODEL_FILENAME); the setting field is kept as a forward-compat
-    // hook so we can swap the underlying model without a migration dance.
-    if settings.cleanup_model != "chirp-v2" {
-        log::info!("Migrated cleanup_model '{}' → 'chirp-v2'", settings.cleanup_model);
-        settings.cleanup_model = "chirp-v2".into();
+    // Migrate from the single-OpenAI BYOK shape (cleanup_api_key +
+    // cleanup_api_model in settings.json, provider == "openai") to the new
+    // multi-provider shape: keychain entry + per-provider configs map.
+    let legacy_api_key = raw_json
+        .as_ref()
+        .and_then(|v| v.get("cleanupApiKey"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let legacy_api_model = raw_json
+        .as_ref()
+        .and_then(|v| v.get("cleanupApiModel"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    if settings.cleanup_provider == "openai" {
+        log::info!("Migrating cleanup_provider 'openai' → 'openai_compatible'");
+        settings.cleanup_provider = "openai_compatible".into();
+        dirty = true;
     }
 
-    // Clean up old model files (Qwen, chirp-cleanup) in background
-    cleanup_old_models();
+    let valid_providers = ["local", "openai_compatible", "anthropic", "gemini"];
+    if !valid_providers.contains(&settings.cleanup_provider.as_str()) {
+        log::info!(
+            "Migrated cleanup_provider '{}' to 'local'",
+            settings.cleanup_provider
+        );
+        settings.cleanup_provider = "local".into();
+        dirty = true;
+    }
+
+    if settings.cleanup_provider_configs.is_empty() {
+        settings.cleanup_provider_configs = default_cleanup_provider_configs();
+        dirty = true;
+    }
+
+    // Ensure each cloud provider has an entry with sensible defaults.
+    let defaults = default_cleanup_provider_configs();
+    for (id, default_cfg) in defaults {
+        let entry = settings
+            .cleanup_provider_configs
+            .entry(id.clone())
+            .or_insert_with(|| {
+                dirty = true;
+                default_cfg.clone()
+            });
+        if entry.model.trim().is_empty() {
+            entry.model = default_cfg.model.clone();
+            dirty = true;
+        }
+        if id == "openai_compatible"
+            && entry
+                .base_url
+                .as_ref()
+                .map(|u| u.trim().is_empty())
+                .unwrap_or(true)
+        {
+            entry.base_url = Some(OPENAI_COMPATIBLE_DEFAULT_BASE_URL.into());
+            dirty = true;
+        }
+    }
+
+    // If a legacy OpenAI model was set, prefer it over the default.
+    if let Some(model) = legacy_api_model.as_ref() {
+        if !model.trim().is_empty() {
+            if let Some(cfg) = settings.cleanup_provider_configs.get_mut("openai_compatible") {
+                if cfg.model != *model {
+                    cfg.model = model.clone();
+                    dirty = true;
+                }
+            }
+        }
+    }
+
+    // Move legacy API key into the OS keychain. Even if migration to keychain
+    // fails (e.g. unsupported platform), we still drop the plaintext field
+    // from settings.json on the next save.
+    if let Some(key) = legacy_api_key.as_ref() {
+        if !key.trim().is_empty() && secrets::get_api_key("openai_compatible").is_none() {
+            match secrets::set_api_key("openai_compatible", key) {
+                Ok(_) => log::info!("Migrated legacy OpenAI key into OS keychain"),
+                Err(e) => log::warn!("Failed to migrate OpenAI key into keychain: {e}"),
+            }
+        }
+        // Force a save so the plaintext key is removed from settings.json.
+        dirty = true;
+    }
 
     // Migrate old Tauri shortcut format to new event.code-based format
     let migrated = migrate_hotkey(&settings.hotkey);
     if migrated != settings.hotkey {
         log::info!("Migrated hotkey '{}' → '{}'", settings.hotkey, migrated);
         settings.hotkey = migrated;
+        dirty = true;
+    }
+
+    if dirty {
         let _ = save_settings(&settings);
     }
+
+    // Clean up old model files (Qwen, chirp-cleanup) in background
+    cleanup_old_models();
 
     settings
 }

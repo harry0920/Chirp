@@ -76,6 +76,65 @@ function Card({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** Two-step uninstall: tap once → button morphs to "Confirm? · Cancel"
+ *  pair for 3s. Confirm fires onConfirm; Cancel or timeout reverts. */
+function UninstallButton({ onConfirm }: { onConfirm: () => void | Promise<void> }) {
+  const [confirming, setConfirming] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+  }, [])
+
+  const startConfirm = () => {
+    setConfirming(true)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => setConfirming(false), 3000)
+  }
+
+  const cancel = () => {
+    setConfirming(false)
+    if (timerRef.current) clearTimeout(timerRef.current)
+  }
+
+  const confirm = async () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setConfirming(false)
+    await onConfirm()
+  }
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={startConfirm}
+        className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-geist text-[11px] text-white/60 transition-all duration-150 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
+      >
+        Uninstall
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1 animate-fade-in">
+      <button
+        type="button"
+        onClick={confirm}
+        className="rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1 font-geist text-[11px] text-red-300 transition-all duration-150 hover:bg-red-500/20 active:scale-95"
+      >
+        Confirm
+      </button>
+      <button
+        type="button"
+        onClick={cancel}
+        className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-geist text-[11px] text-white/60 transition-all duration-150 hover:bg-white/[0.07] active:scale-95"
+      >
+        Cancel
+      </button>
+    </div>
+  )
+}
+
 function FeedbackSection() {
   const [expanded, setExpanded] = useState(false)
   const [text, setText] = useState('')
@@ -428,6 +487,29 @@ export function SettingsPage() {
     }
   }
 
+  const handleSpeechUninstall = async () => {
+    try {
+      await tauri.deleteSpeechModel(store.model)
+      store.updateSettings({
+        modelDownloaded: { ...store.modelDownloaded, [store.model]: false },
+      })
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('Speech model uninstall failed:', e)
+    }
+  }
+
+  const handleLlmUninstall = async () => {
+    try {
+      await tauri.deleteLlmModel()
+      setLlmDownloaded(false)
+      store.setLlmReady(false)
+      // Backend disables ai_cleanup on uninstall — mirror in store.
+      store.updateSettings({ aiCleanup: false })
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('Cleanup model uninstall failed:', e)
+    }
+  }
+
   const testLinkText =
     testState === 'recording'
       ? `Recording... (${testCountdown}s)`
@@ -686,7 +768,7 @@ export function SettingsPage() {
 
       {/* ── AI & OUTPUT ────────────────────────────── */}
       <div className="animate-slide-up stagger-3">
-        <SectionLabel>AI &amp; Output</SectionLabel>
+        <SectionLabel>Transcription</SectionLabel>
         <Card>
           <Row>
             <div>
@@ -698,7 +780,23 @@ export function SettingsPage() {
               onChange={(v) => store.updateSettings({ smartFormatting: v })}
             />
           </Row>
+          <Row last>
+            <div>
+              <div className="text-[13px] font-medium text-dm-primary">Enhanced Recognition</div>
+              <div className="text-[11px] text-dm-secondary mt-0.5">Better accuracy with accents and noise, slightly slower</div>
+            </div>
+            <Toggle
+              checked={store.beamSearch}
+              onChange={(v) => store.updateSettings({ beamSearch: v })}
+            />
+          </Row>
+        </Card>
+      </div>
 
+      {/* ── SMART CLEANUP ─────────────────────────── */}
+      <div className="animate-slide-up stagger-4">
+        <SectionLabel>Smart Cleanup</SectionLabel>
+        <Card>
           <Row>
             <div>
               <div className="flex items-center gap-2">
@@ -736,8 +834,11 @@ export function SettingsPage() {
 
               {usingCloudCleanup && activeCloudProvider && activeCloudConfig && (
                 <>
-                  <div className="px-[18px] py-[10px] border-b border-dm-row-sep bg-card-hover/50">
-                    <div className="text-[11px] text-dm-secondary leading-relaxed">
+                  <div className="border-y border-chirp-yellow/20 bg-chirp-yellow/[0.03] px-[18px] py-[10px]">
+                    <div className="font-geist text-[11px] uppercase tracking-[0.16em] text-chirp-yellow/85">
+                      Cloud provider
+                    </div>
+                    <div className="mt-1 text-[11px] text-dm-secondary leading-relaxed">
                       Transcripts will be sent to {CLOUD_PROVIDER_LABEL[activeCloudProvider]} under their privacy policy. Your API key stays in this device's keychain.
                     </div>
                   </div>
@@ -845,22 +946,11 @@ export function SettingsPage() {
               </Row>
             </>
           )}
-
-          <Row last>
-            <div>
-              <div className="text-[13px] font-medium text-dm-primary">Enhanced Recognition</div>
-              <div className="text-[11px] text-dm-secondary mt-0.5">Better accuracy with accents and noise, slightly slower</div>
-            </div>
-            <Toggle
-              checked={store.beamSearch}
-              onChange={(v) => store.updateSettings({ beamSearch: v })}
-            />
-          </Row>
         </Card>
       </div>
 
       {/* ── BEHAVIOR ───────────────────────────────── */}
-      <div className="animate-slide-up stagger-4">
+      <div className="animate-slide-up stagger-5">
         <SectionLabel>Behavior</SectionLabel>
         <Card>
           <Row>
@@ -893,7 +983,7 @@ export function SettingsPage() {
               onChange={(v) => store.updateSettings({ playSoundOnComplete: v })}
             />
           </Row>
-          <Row>
+          <Row last>
             <div>
               <div className="text-[13px] font-medium text-dm-primary">Overlay position</div>
               <div className="text-[11px] text-dm-secondary mt-0.5">
@@ -908,6 +998,13 @@ export function SettingsPage() {
               Reposition
             </button>
           </Row>
+        </Card>
+      </div>
+
+      {/* ── DATA ───────────────────────────────────── */}
+      <div className="animate-slide-up stagger-6">
+        <SectionLabel>Data</SectionLabel>
+        <Card>
           <Row>
             <div>
               <div className="text-[13px] font-medium text-dm-primary">History retention</div>
@@ -926,23 +1023,7 @@ export function SettingsPage() {
               />
             </div>
           </Row>
-          <Row last>
-            <div>
-              <div className="text-[13px] font-medium text-dm-primary">Dark mode</div>
-              <div className="text-[11px] text-dm-secondary mt-0.5">Use a dark theme for the content area</div>
-            </div>
-            <Toggle
-              checked={store.darkMode}
-              onChange={(v) => store.updateSettings({ darkMode: v })}
-            />
-          </Row>
-        </Card>
-      </div>
 
-      {/* ── MODELS ─────────────────────────────────── */}
-      <div className="animate-slide-up stagger-5">
-        <SectionLabel>Models</SectionLabel>
-        <Card>
           {/* Speech model */}
           <Row>
             <div className="flex-1">
@@ -970,9 +1051,12 @@ export function SettingsPage() {
             </div>
             <div className="ml-4">
               {isDownloaded ? (
-                <div className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 rounded-full bg-chirp-success" />
-                  <span className="text-[12px] text-dm-muted">Ready</span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-chirp-success" />
+                    <span className="text-[12px] text-dm-muted">Ready</span>
+                  </div>
+                  <UninstallButton onConfirm={handleSpeechUninstall} />
                 </div>
               ) : (
                 <Button onClick={handleDownload} disabled={store.modelDownloadProgress !== null}>
@@ -1010,9 +1094,12 @@ export function SettingsPage() {
             </div>
             <div className="ml-4">
               {llmDownloaded ? (
-                <div className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 rounded-full bg-chirp-success" />
-                  <span className="text-[12px] text-dm-muted">Ready</span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-chirp-success" />
+                    <span className="text-[12px] text-dm-muted">Ready</span>
+                  </div>
+                  <UninstallButton onConfirm={handleLlmUninstall} />
                 </div>
               ) : (
                 <Button onClick={handleLlmDownload} disabled={store.llmDownloadProgress !== null}>
@@ -1025,7 +1112,7 @@ export function SettingsPage() {
       </div>
 
       {/* Privacy & Feedback */}
-      <div className="mt-6">
+      <div className="animate-slide-up stagger-7">
         <SectionLabel>Privacy & Feedback</SectionLabel>
         <Card>
           <Row>
