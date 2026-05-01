@@ -117,14 +117,14 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search dictations"
-            className="w-full rounded-full border border-white/10 bg-white/[0.03] py-2 pl-9 pr-9 font-geist text-[12px] text-white placeholder:text-white/30 transition-colors focus:border-chirp-yellow/50 focus:outline-none focus:ring-1 focus:ring-chirp-yellow/30"
+            className="w-full rounded-full border border-white/10 bg-white/[0.03] py-2 pl-9 pr-9 font-geist text-[12px] text-white placeholder:text-white/30 transition-all duration-150 focus:border-chirp-yellow/50 focus:outline-none focus:ring-1 focus:ring-chirp-yellow/30"
           />
           {search && (
             <button
               type="button"
               onClick={() => setSearch('')}
               aria-label="Clear search"
-              className="absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/[0.06] hover:text-white"
+              className="absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-white/45 transition-all duration-150 hover:bg-white/[0.06] hover:text-white active:scale-90"
             >
               <X size={12} />
             </button>
@@ -133,7 +133,7 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
         <button
           type="button"
           onClick={handleExport}
-          className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 font-geist text-[12px] text-white/85 transition-colors hover:bg-white/[0.07]"
+          className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 font-geist text-[12px] text-white/85 transition-all duration-150 hover:bg-white/[0.07] active:scale-95"
         >
           <Download size={13} />
           Export
@@ -173,13 +173,13 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
                   return (
                     <li
                       key={entry.timestamp}
-                      className="-mx-5 px-5 transition-colors hover:bg-white/[0.02]"
+                      className="-mx-5 px-5 transition-colors duration-150 hover:bg-white/[0.02]"
                     >
                       <button
                         type="button"
                         onClick={() => handleRowClick(entry.timestamp)}
                         aria-expanded={expanded}
-                        className="grid w-full grid-cols-[64px_1fr] items-start gap-4 py-3 text-left"
+                        className="grid w-full grid-cols-[64px_1fr] items-start gap-4 py-3 text-left transition-transform duration-100 active:scale-[0.995]"
                       >
                         <span
                           className="pt-0.5 font-geist-mono text-[11px] text-white/35"
@@ -189,7 +189,7 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
                         </span>
                         <div className="flex min-w-0 flex-col gap-1">
                           <p
-                            className={`font-geist text-[13px] text-white/85 ${
+                            className={`font-geist text-[13px] text-white/85 transition-[max-height] duration-300 ease-out ${
                               expanded ? 'whitespace-pre-wrap break-words' : 'truncate'
                             }`}
                           >
@@ -210,17 +210,27 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
                           </div>
                         </div>
                       </button>
-                      {expanded && (
-                        <div className="grid grid-cols-[64px_1fr] gap-4 pb-4 pl-0 animate-fade-in">
-                          <span aria-hidden />
-                          <div className="flex items-center gap-2">
+
+                      {/* Expand drawer — grid-rows trick animates between
+                          0fr (collapsed) and 1fr (expanded) so the natural
+                          content height interpolates smoothly with no JS. */}
+                      <div
+                        className={`grid grid-cols-[64px_1fr] gap-4 transition-[grid-template-rows,opacity,padding] duration-300 ease-out ${
+                          expanded
+                            ? 'grid-rows-[1fr] pb-4 opacity-100'
+                            : 'grid-rows-[0fr] pb-0 opacity-0'
+                        }`}
+                      >
+                        <span aria-hidden />
+                        <div className="overflow-hidden">
+                          <div className="flex items-center gap-2 pt-1">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleCopyClick(entry)
                               }}
-                              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-geist text-[11px] text-white/85 transition-colors hover:bg-white/[0.07]"
+                              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-geist text-[11px] text-white/85 transition-all duration-150 hover:bg-white/[0.07] active:scale-95"
                             >
                               <Copy size={12} />
                               {copied ? 'Copied' : 'Copy'}
@@ -231,14 +241,14 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
                                 e.stopPropagation()
                                 onDelete(entry)
                               }}
-                              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-geist text-[11px] text-white/85 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-geist text-[11px] text-white/85 transition-all duration-150 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
                             >
                               <Trash2 size={12} />
                               Delete
                             </button>
                           </div>
                         </div>
-                      )}
+                      </div>
                     </li>
                   )
                 })}

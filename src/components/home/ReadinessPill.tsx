@@ -48,7 +48,7 @@ export function ReadinessPill() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-geist text-[11px] text-white/85 backdrop-blur-md transition-colors hover:bg-white/[0.06]"
+        className="flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-geist text-[11px] text-white/85 backdrop-blur-md transition-all duration-150 hover:bg-white/[0.06] active:scale-95"
       >
         <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
         <span className="uppercase tracking-[0.14em]">

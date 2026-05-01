@@ -145,7 +145,7 @@ function PeriodToggle({ period, onChange }: { period: Period; onChange: (p: Peri
             ref={(el) => { buttonRefs.current[i] = el }}
             type="button"
             onClick={() => onChange(p.id)}
-            className={`relative transition-colors ${
+            className={`relative transition-all duration-150 active:scale-95 ${
               p.id === period ? 'text-white' : 'text-white/40 hover:text-white/70'
             }`}
           >
