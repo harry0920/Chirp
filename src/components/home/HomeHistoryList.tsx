@@ -37,16 +37,13 @@ function formatDuration(ms: number): string {
   return `${h}h ${m % 60}m`
 }
 
-/** Sub-second precision for short durations — "4.2s" reads better
- *  than rounding to "4s" when comparing speech vs processing in the
- *  expanded breakdown. Falls back to formatDuration for >= 60s. */
+/** Always-seconds formatting for the expanded breakdown — matches the
+ *  pre-redesign Home page display, which the user has built intuition
+ *  for. "68.4s" reads as a single comparable number; "1m 8s" reads
+ *  as a different magnitude even though it's the same value. */
 function formatPreciseDuration(ms: number): string {
   if (ms <= 0) return '0s'
-  if (ms < 60_000) {
-    const s = ms / 1000
-    return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
-  }
-  return formatDuration(ms)
+  return `${(ms / 1000).toFixed(1)}s`
 }
 
 function formatFullTimestamp(timestamp: string): string {
