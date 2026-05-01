@@ -243,48 +243,45 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
                         </div>
                       </button>
 
-                      {/* Expand drawer — grid-rows trick animates between
-                          0fr (collapsed) and 1fr (expanded) so the natural
-                          content height interpolates smoothly with no JS. */}
-                      <div
-                        className={`grid grid-cols-[64px_1fr] gap-4 transition-[grid-template-rows,opacity,padding] duration-300 ease-out ${
-                          expanded
-                            ? 'grid-rows-[1fr] pb-4 opacity-100'
-                            : 'grid-rows-[0fr] pb-0 opacity-0'
-                        }`}
-                      >
-                        <span aria-hidden />
-                        <div className="overflow-hidden">
-                          <ExpandedDetails
-                            entry={entry}
-                            appDisplay={appDisplay}
-                          />
-                          <div className="flex items-center gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleCopyClick(entry)
-                              }}
-                              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-geist text-[11px] text-white/85 transition-all duration-150 hover:bg-white/[0.07] active:scale-95"
-                            >
-                              <Copy size={12} />
-                              {copied ? 'Copied' : 'Copy'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onDelete(entry)
-                              }}
-                              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-geist text-[11px] text-white/85 transition-all duration-150 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
-                            >
-                              <Trash2 size={12} />
-                              Delete
-                            </button>
+                      {/* Expand drawer — snaps to full height instantly
+                          (avoids the grid-rows layout jank when many rows
+                          are nearby) and fades the inner content in over
+                          180ms. Feels snappier than animated height. */}
+                      {expanded && (
+                        <div className="grid grid-cols-[64px_1fr] gap-4 pb-4 animate-fade-in">
+                          <span aria-hidden />
+                          <div>
+                            <ExpandedDetails
+                              entry={entry}
+                              appDisplay={appDisplay}
+                            />
+                            <div className="flex items-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleCopyClick(entry)
+                                }}
+                                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-geist text-[11px] text-white/85 transition-all duration-150 hover:bg-white/[0.07] active:scale-95"
+                              >
+                                <Copy size={12} />
+                                {copied ? 'Copied' : 'Copy'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDelete(entry)
+                                }}
+                                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-geist text-[11px] text-white/85 transition-all duration-150 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
+                              >
+                                <Trash2 size={12} />
+                                Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </li>
                   )
                 })}
@@ -304,8 +301,11 @@ function ExpandedDetails({
   entry: TranscriptionEntry
   appDisplay: string | null
 }) {
+  // speech_duration_ms is how long the user actually spoke (VAD-derived).
+  // duration_ms is how long Chirp took to process AFTER the user released
+  // the hotkey (transcription + cleanup + injection). They're independent
+  // timings — we surface both, no derived "total".
   const wpm = computeWpm(entry.wordCount, entry.speechDurationMs)
-  const processingMs = Math.max(0, entry.durationMs - entry.speechDurationMs)
   const hasSpeechTiming = entry.speechDurationMs > 0
   const hasProcessing = entry.durationMs > 0
 
@@ -314,40 +314,35 @@ function ExpandedDetails({
   if (hasSpeechTiming) {
     const speech = formatPreciseDuration(entry.speechDurationMs)
     rows.push({
-      label: 'Speech',
+      label: 'Spoke for',
       value: wpm !== null ? `${speech} · ${wpm} wpm` : speech,
     })
   }
   if (hasProcessing) {
     rows.push({
-      label: entry.wasCleanedUp ? 'Polish + processing' : 'Processing',
-      value: formatPreciseDuration(processingMs),
-    })
-    rows.push({
-      label: 'Total',
+      label: 'Processed in',
       value: formatPreciseDuration(entry.durationMs),
     })
   }
   rows.push({
     label: 'Words',
-    value: `${entry.wordCount.toLocaleString()}`,
+    value: entry.wordCount.toLocaleString(),
   })
   if (entry.targetApp) {
     rows.push({
       label: 'App',
-      value: appDisplay
-        ? appDisplay !== entry.targetApp
+      value:
+        appDisplay && appDisplay !== entry.targetApp
           ? `${appDisplay} · ${entry.targetApp}`
-          : entry.targetApp
-        : entry.targetApp,
+          : entry.targetApp,
     })
   }
 
   return (
-    <dl className="mb-3 grid grid-cols-[110px_1fr] gap-x-4 gap-y-1.5 font-geist text-[11px]">
+    <dl className="mb-3 grid grid-cols-[120px_1fr] gap-x-4 gap-y-1.5 font-geist text-[11px]">
       {rows.map((row) => (
         <div key={row.label} className="contents">
-          <dt className="font-medium uppercase tracking-[0.16em] text-white/40">
+          <dt className="font-medium uppercase tracking-[0.14em] text-white/40 whitespace-nowrap">
             {row.label}
           </dt>
           <dd
