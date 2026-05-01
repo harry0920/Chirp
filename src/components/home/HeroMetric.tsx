@@ -65,26 +65,26 @@ export function HeroMetric({ daily, totalWords, period, onPeriodChange }: Props)
   return (
     <section className="card-surface halo-hero relative overflow-hidden">
       <div className="px-8 pt-7">
-        <div className="flex items-end justify-between gap-6">
-          <div className="flex items-end gap-5">
-            <span
-              className="block font-geist font-semibold leading-none text-white"
-              style={{
-                fontFeatureSettings: '"tnum"',
-                letterSpacing: '-0.04em',
-                fontSize: 'clamp(64px, 9vw, 112px)',
-              }}
-            >
-              {animatedTotal.toLocaleString()}
-            </span>
-            <span
-              key={period}
-              className="mb-3 block font-geist text-[11px] font-medium uppercase tracking-[0.18em] text-white/45 animate-fade-in"
-            >
-              Words {PERIOD_NOUN[period]}
-            </span>
-          </div>
+        <div className="flex justify-end">
           <PeriodToggle period={period} onChange={onPeriodChange} />
+        </div>
+        <div className="mt-2 flex items-end gap-5">
+          <span
+            className="block font-geist font-semibold leading-none text-white"
+            style={{
+              fontFeatureSettings: '"tnum"',
+              letterSpacing: '-0.04em',
+              fontSize: 'clamp(64px, 9vw, 112px)',
+            }}
+          >
+            {animatedTotal.toLocaleString()}
+          </span>
+          <span
+            key={period}
+            className="mb-3 block font-geist text-[11px] font-medium uppercase tracking-[0.18em] text-white/45 animate-fade-in"
+          >
+            Words {PERIOD_NOUN[period]}
+          </span>
         </div>
       </div>
 
@@ -137,7 +137,7 @@ function PeriodToggle({ period, onChange }: { period: Period; onChange: (p: Peri
   return (
     <div
       ref={containerRef}
-      className="relative mb-3 flex items-center gap-1 font-geist text-[11px] uppercase tracking-[0.16em]"
+      className="relative flex items-center gap-1 font-geist text-[11px] uppercase tracking-[0.16em]"
     >
       {PERIODS.map((p, i) => (
         <span key={p.id} className="flex items-center gap-1">
