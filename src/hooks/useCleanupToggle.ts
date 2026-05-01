@@ -14,6 +14,13 @@ export function useCleanupToggle() {
   const [cleanupStarting, setCleanupStarting] = useState(false)
 
   const handleCleanupToggle = async (enabled: boolean) => {
+    const usesCloudCleanup = store.cleanupProvider !== 'local'
+
+    if (enabled && usesCloudCleanup) {
+      store.updateSettings({ aiCleanup: true })
+      return
+    }
+
     if (enabled && !llmDownloaded) {
       // Model not downloaded — show upgrade modal to trigger download
       store.setUpgradeModalOpen(true)

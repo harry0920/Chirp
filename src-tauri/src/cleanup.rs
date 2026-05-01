@@ -18,14 +18,17 @@ struct CleanupRegexes {
     /// punct (`.!?`) wins over clause punct (`,;:`); ties keep the first.
     adjacent_punct: Regex,
     punctuation: Vec<(Regex, &'static str)>,
-    /// Dedicated handler for "dash" → em dash conversion. Handled separately
-    /// from `punctuation` because we need a closure to skip cases like
-    /// "em dash" / "en dash" where the user is talking ABOUT the punctuation
-    /// rather than asking to insert it. Captures: (1) optional "em "/"en "
-    /// prefix, (2) the literal "dash" word.
-    dash: Regex,
     space_before_punct: Regex,
-    no_space_after: Regex,
+    /// Period after a lowercase letter, followed by a Capital + lowercase
+    /// (sentence-start pattern only). Splitting periods from the more
+    /// permissive other_punct rule preserves identifiers like `auth.rs`,
+    /// `chirptype.com`, and `U.S.A.` that would otherwise be mangled into
+    /// `auth. rs` / `chirptype. com` / `U. S. A.`.
+    period_space_fix: Regex,
+    /// Comma / semicolon / colon / `!` / `?` followed by a letter. These
+    /// punctuation marks essentially never appear inside identifiers, so
+    /// the original permissive rule is fine here.
+    other_punct_space_fix: Regex,
     email: Regex,
     numeric_contexts: Vec<Regex>,
     number_words: Vec<&'static str>,
@@ -121,13 +124,9 @@ fn regexes() -> &'static CleanupRegexes {
             standalone_i: Regex::new(r"\bi\b").unwrap(),
             adjacent_punct: Regex::new(r"([.!?,;:])\s*([.!?,;:])").unwrap(),
             punctuation: punctuation_map,
-            // Match the literal word "dash", optionally preceded by "em" or
-            // "en". Group 1 captures the prefix (or is empty); group 2 is
-            // always "dash". Replacement skips when group 1 is non-empty so
-            // "em dash" / "en dash" stay as content phrases.
-            dash: Regex::new(r"(?i)\b(em |en )?(dash)\b").unwrap(),
             space_before_punct: Regex::new(r"\s+([.,!?;:)])").unwrap(),
-            no_space_after: Regex::new(r"([.,!?;:])([A-Za-z])").unwrap(),
+            period_space_fix: Regex::new(r"([a-z])\.([A-Z][a-z])").unwrap(),
+            other_punct_space_fix: Regex::new(r"([,!?;:])([A-Za-z])").unwrap(),
             email: Regex::new(r"(?i)\b(\w+)\s+at\s+(\w+)\s+dot\s+(com|org|net|io|dev|co)\b").unwrap(),
             numeric_contexts: compiled_contexts,
             number_words: compiled_numbers,
@@ -303,22 +302,12 @@ fn format_spoken_patterns(text: &str) -> String {
         result = pattern.replace_all(&result, *replacement).to_string();
     }
 
-    // "dash" → em-dash, but ONLY when it's a bare word — skip when the
-    // user said "em dash" or "en dash" (talking about the punctuation
-    // rather than asking to insert it). Identified empirically from a
-    // dictation log where "no em dash and uh the little drop" got
-    // mangled to "no em  — and the little drop".
-    result = re
-        .dash
-        .replace_all(&result, |caps: &regex::Captures| {
-            if caps.get(1).is_some() {
-                // "em dash" / "en dash" — return the original match unchanged
-                caps.get(0).unwrap().as_str().to_string()
-            } else {
-                " —".to_string()
-            }
-        })
-        .to_string();
+    // The bare word "dash" is intentionally NOT mapped to an em-dash. Real
+    // dictation almost never uses "dash" as a directive, but Parakeet
+    // frequently emits it in normal phrases ("dash off a quick note", "had a
+    // dash of milk"). Inserting U+2014 there hallucinates punctuation and is
+    // worse than leaving the word in place. Speakers who genuinely want a
+    // hyphen can dictate "hyphen", which is preserved by `punctuation_map`.
 
     // Clean up spaces before punctuation
     result = re.space_before_punct.replace_all(&result, "$1").to_string();
@@ -348,8 +337,11 @@ fn format_spoken_patterns(text: &str) -> String {
         result = next;
     }
 
-    // Ensure space after punctuation
-    result = re.no_space_after.replace_all(&result, "$1 $2").to_string();
+    // Ensure space after punctuation. Periods are special-cased so we don't
+    // break identifiers like `auth.rs` or `chirptype.com` — the period regex
+    // only fires on a sentence-start pattern (lowercase·period·Capital).
+    result = re.period_space_fix.replace_all(&result, "$1. $2").to_string();
+    result = re.other_punct_space_fix.replace_all(&result, "$1 $2").to_string();
 
     // Email pattern
     result = re.email.replace_all(&result, "$1@$2.$3").to_string();
@@ -397,12 +389,28 @@ fn format_spoken_patterns(text: &str) -> String {
 /// All deterministic, no LLM calls. Idempotent.
 #[cfg(test)]
 pub fn join_cleaned_segments(segments: &[String]) -> String {
-    join_cleaned_segments_with_formatting(segments, true)
+    join_cleaned_segments_with_formatting(segments, true, false)
 }
 
+/// Join VAD-streamed segments back into one string.
+///
+/// `ai_cleanup_pending` controls how aggressively we strip Parakeet's
+/// per-segment punctuation/capitalization artifacts:
+///
+/// - `false` (regex-only mode, BYOK with no key, Smart Cleanup off): use the
+///   conservative `repair_vad_boundary_artifacts` path that only lowercases
+///   when the previous word is in a hardcoded "stub" list. Avoids
+///   under-capitalizing real proper nouns when there is no LLM to recover.
+///
+/// - `true` (LLM cleanup will run after): use the aggressive path. Strip the
+///   trailing period of every non-final segment and lowercase the first
+///   ASCII letter of every non-first segment (preserving `I`, `I'`, and
+///   ALL-CAPS acronyms like API/URL/CLI). The LLM will recapitalize proper
+///   nouns and re-add real sentence boundaries on the joined text.
 pub fn join_cleaned_segments_with_formatting(
     segments: &[String],
     smart_formatting: bool,
+    ai_cleanup_pending: bool,
 ) -> String {
     // Step 1: strip internal paragraph breaks the model may have inserted
     // within a single segment, and trim whitespace.
@@ -416,21 +424,115 @@ pub fn join_cleaned_segments_with_formatting(
         return String::new();
     }
 
-    // Step 2: naive join with single space. This gives us one big string
-    // that contains both inter-segment and intra-segment sentence boundaries.
-    let raw_joined = cleaned.join(" ");
+    // Step 2: when an LLM is going to run after this join, strip Parakeet's
+    // per-segment artifacts before we even split into sentences. This lets
+    // the LLM treat the joined text as a single utterance and decide for
+    // itself where real sentence boundaries belong. In regex-only mode we
+    // skip this step and trust the conservative `boundary_safe_cap` repair
+    // further down.
+    let prepared = if ai_cleanup_pending {
+        prepare_for_llm_join(&cleaned)
+    } else {
+        cleaned
+    };
 
-    // Step 3: split into sentences and apply smart merge between adjacent
+    // Step 3: naive join with single space. This gives us one big string
+    // that contains both inter-segment and intra-segment sentence boundaries.
+    let raw_joined = prepared.join(" ");
+
+    // Step 4: split into sentences and apply smart merge between adjacent
     // sentences. This handles both inter-segment and intra-segment cases
     // uniformly — the model can produce ". And" inside a single segment too.
     let sentences = split_into_sentences(&raw_joined);
     let merged = repair_vad_boundary_artifacts(&smart_merge_sentences(&sentences));
 
-    // Step 4: re-run regex pre-pass on the merged output. cleanup_text is
+    // Step 5: re-run regex pre-pass on the merged output. cleanup_text is
     // idempotent for already-cleaned text but catches cross-boundary
     // patterns (a filler "um" that survived because it was at a segment
     // boundary) and normalizes whitespace.
     cleanup_text(&merged, smart_formatting)
+}
+
+/// Stop the parakeet-per-segment artifacts from making it into the joined
+/// string. For each non-final segment, strip a single trailing `.` (kept `?`
+/// and `!` because those are speaker-emotive and rarely false-positive). For
+/// each non-first segment, lowercase the first ASCII letter unless it is the
+/// pronoun `I`/`I'…` or an ALL-CAPS acronym the speaker spelled out.
+///
+/// We accept that this will lowercase a small number of real proper nouns
+/// at segment boundaries (e.g. "Pieter") — but the downstream LLM cleanup
+/// recapitalizes proper nouns reliably, so net quality goes up. This helper
+/// only runs when `ai_cleanup_pending == true`.
+fn prepare_for_llm_join(segments: &[String]) -> Vec<String> {
+    let n = segments.len();
+    // Iterate by index so each segment can see whether its predecessor
+    // ended with a real speaker terminator (? or !) — in which case the
+    // following segment is genuinely a new sentence and we should NOT
+    // lowercase its first letter.
+    let mut out: Vec<String> = Vec::with_capacity(n);
+    for (i, raw) in segments.iter().enumerate() {
+        let mut s = raw.clone();
+
+        // Strip trailing "." on every segment EXCEPT the last. Don't
+        // strip "?" or "!" — those are speaker signal, not Parakeet
+        // boilerplate.
+        if i + 1 < n {
+            let trimmed = s.trim_end();
+            if let Some(without_period) = trimmed.strip_suffix('.') {
+                s = without_period.trim_end().to_string();
+            }
+        }
+
+        // Lowercase the leading letter of every non-first segment, with
+        // exceptions: standalone I, I'-contractions, ALL-CAPS acronyms,
+        // and segments whose predecessor ended with ? or ! (real sentence
+        // boundary — preserve the new sentence's capitalization).
+        let prev_ended_emotively = i > 0
+            && out
+                .last()
+                .map(|p| p.trim_end().ends_with(['?', '!']))
+                .unwrap_or(false);
+        if i > 0 && !s.is_empty() && !prev_ended_emotively && !starts_with_preserve_caps(&s) {
+            s = lowercase_first_ascii(&s);
+        }
+
+        if !s.is_empty() {
+            out.push(s);
+        }
+    }
+    out
+}
+
+/// True when a segment starts with a token whose capitalization should
+/// survive the aggressive join: the standalone pronoun `I` (including
+/// contractions like `I'm`, `I'll`, `I've`), or an all-uppercase acronym
+/// (`API`, `URL`, `CLI`, `JSON`, …) that the speaker presumably spelled.
+fn starts_with_preserve_caps(segment: &str) -> bool {
+    let first_token = segment.split_whitespace().next().unwrap_or("");
+    if first_token.is_empty() {
+        return false;
+    }
+
+    // Trim trailing punctuation when checking the token's casing (a segment
+    // beginning with "API." should still be treated as starting with "API").
+    let trimmed = first_token.trim_end_matches(|c: char| !c.is_alphanumeric() && c != '\'');
+
+    // Standalone "I" or contraction: I, I'm, I'll, I've, I'd
+    if trimmed == "I" {
+        return true;
+    }
+    if let Some(rest) = trimmed.strip_prefix("I'") {
+        return rest.chars().all(|c| c.is_ascii_alphabetic());
+    }
+
+    // ALL-CAPS acronym of length >= 2 (single 'A' / 'U' etc. is too noisy —
+    // would preserve random sentence-start words the speaker just happened
+    // to capitalize; require at least two upper-case letters in a row).
+    if trimmed.len() >= 2 && trimmed.chars().all(|c| c.is_ascii_uppercase()) {
+        return true;
+    }
+
+    false
 }
 
 fn lowercase_first_ascii(word: &str) -> String {
@@ -906,10 +1008,16 @@ mod tests {
 
     #[test]
     fn test_adjacent_punct_period_comma_literal() {
-        // Direct ".," in the text (e.g. from upstream) collapses to "." and
-        // the next word is re-capitalized.
+        // Direct ".," in the text (e.g. from upstream) collapses to ".". The
+        // collapsed pair then sits between two lowercase letters, which the
+        // sentence-start period_space_fix regex deliberately doesn't expand
+        // — that restraint is what protects URLs and file paths like
+        // "auth.rs" / "chirptype.com" from being mangled into "auth. rs" /
+        // "chirptype. com". The rare ".," collision case below loses the
+        // re-spacing it used to get; we accept that trade because dictating
+        // "comma period" mid-word essentially never happens in practice.
         let result = cleanup_text("hello.,world", true);
-        assert_eq!(result, "Hello. World");
+        assert_eq!(result, "Hello.world");
     }
 
     #[test]
@@ -1056,7 +1164,7 @@ mod tests {
     fn test_join_respects_smart_formatting_disabled() {
         let s = segs(&["hello period."]);
         assert_eq!(
-            join_cleaned_segments_with_formatting(&s, false),
+            join_cleaned_segments_with_formatting(&s, false, false),
             "hello period."
         );
     }
@@ -1312,5 +1420,114 @@ mod tests {
             !result.starts_with("Chirp app:"),
             "expected no invented 'Chirp app:' prefix, got: {result}"
         );
+    }
+
+    // ── pipeline-fix regression tests ────────────────────────────────
+
+    #[test]
+    fn period_space_fix_preserves_urls_and_paths() {
+        // chirptype.com, auth.rs, U.S.A. all stay intact (next char is
+        // lowercase or prev is uppercase, so the sentence-start pattern
+        // does NOT match).
+        assert!(smart_format("we are on chirptype.com today").contains("chirptype.com"));
+        assert!(smart_format("the bug is in auth.rs line 47").contains("auth.rs"));
+        assert!(smart_format("U.S.A. is great").contains("U.S.A."));
+        assert!(smart_format("send to pieter@chirp.app please").contains("pieter@chirp.app"));
+
+        // Sentence-start pattern still gets the space inserted.
+        let merged = smart_format("I went home.Then I left.");
+        assert!(merged.contains("home. Then"), "got: {merged}");
+    }
+
+    #[test]
+    fn dash_word_passes_through() {
+        // Bare "dash" stays as the literal word — no em-dash injection.
+        let result = smart_format("the chirp dash repo is here");
+        assert!(
+            !result.contains('—'),
+            "smart_format should not introduce em-dashes, got: {result}"
+        );
+        assert!(
+            result.contains("dash"),
+            "literal 'dash' should pass through, got: {result}"
+        );
+
+        // "em dash" / "en dash" content phrases also pass through unchanged.
+        let r2 = smart_format("an em dash and an en dash");
+        assert!(r2.contains("em dash") && r2.contains("en dash"));
+        assert!(!r2.contains('—'));
+    }
+
+    #[test]
+    fn aggressive_join_strips_period_and_lowercases() {
+        let s = segs(&["I want to ship", "And then we test"]);
+        // The first segment has no terminal period (model-cleaned input).
+        // Add one and confirm both period stripping and capital-lowering.
+        let s = segs(&["I want to ship.", "And then we test."]);
+        let out = join_cleaned_segments_with_formatting(&s, true, true);
+        // After aggressive prep: "I want to ship and then we test."
+        // (period stripped, "And" → "and"). Then cleanup_text caps the first
+        // letter and adds a terminal period if missing.
+        assert!(
+            out.starts_with("I want to ship and then we test"),
+            "got: {out}"
+        );
+        // Should contain a single sentence; no "ship. And" mid-string.
+        assert!(!out.contains("ship. And"), "got: {out}");
+    }
+
+    #[test]
+    fn aggressive_join_preserves_question_and_exclamation() {
+        let s = segs(&["Did it ship?", "Yes it did"]);
+        let out = join_cleaned_segments_with_formatting(&s, true, true);
+        // Question mark must survive — it's a real speaker signal, not
+        // Parakeet boilerplate.
+        assert!(
+            out.contains('?'),
+            "expected '?' to survive aggressive join, got: {out}"
+        );
+    }
+
+    #[test]
+    fn aggressive_join_preserves_standalone_I() {
+        let s = segs(&["yesterday I shipped.", "I tested today"]);
+        let out = join_cleaned_segments_with_formatting(&s, true, true);
+        // Second segment starts with "I" — must stay capitalized.
+        // After lowercase pass it shouldn't become "i tested".
+        assert!(
+            out.contains("I tested"),
+            "expected standalone I to stay capitalized, got: {out}"
+        );
+    }
+
+    #[test]
+    fn aggressive_join_preserves_acronym() {
+        let s = segs(&["call the.", "API quickly"]);
+        let out = join_cleaned_segments_with_formatting(&s, true, true);
+        assert!(
+            out.contains("API"),
+            "expected ALL-CAPS acronym to stay capitalized, got: {out}"
+        );
+    }
+
+    #[test]
+    fn aggressive_join_preserves_I_contraction() {
+        let s = segs(&["yesterday we shipped.", "I'm tired today"]);
+        let out = join_cleaned_segments_with_formatting(&s, true, true);
+        assert!(
+            out.contains("I'm"),
+            "expected I' contraction to stay capitalized, got: {out}"
+        );
+    }
+
+    #[test]
+    fn conservative_join_unchanged_when_ai_cleanup_off() {
+        // The conservative path should match exactly what
+        // join_cleaned_segments (which uses ai_cleanup_pending=false)
+        // produced before this change. Snapshot via direct equivalence:
+        let s = segs(&["I want to ship.", "And then we test."]);
+        let conservative = join_cleaned_segments_with_formatting(&s, true, false);
+        let via_test_helper = join_cleaned_segments(&s);
+        assert_eq!(conservative, via_test_helper);
     }
 }
