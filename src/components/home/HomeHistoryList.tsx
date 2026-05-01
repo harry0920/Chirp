@@ -227,7 +227,13 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
                           <div className="flex items-center gap-2 font-geist text-[11px] text-white/40">
                             {appDisplay && <span>{appDisplay}</span>}
                             {appDisplay && <span className="text-white/20">·</span>}
-                            <span>{formatDuration(entry.durationMs)}</span>
+                            <span>
+                              {formatDuration(
+                                entry.speechDurationMs > 0
+                                  ? entry.speechDurationMs
+                                  : entry.durationMs,
+                              )}
+                            </span>
                             <span className="text-white/20">·</span>
                             <span>{entry.wordCount} words</span>
                             {entry.wasCleanedUp && (

@@ -30,9 +30,9 @@ export function Dock() {
           type="button"
           onClick={() => setSettingsPage('home')}
           aria-label="chirp"
-          className="halo-mark group relative flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 active:scale-95 hover:bg-white/[0.04]"
+          className="group relative flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-200 active:scale-95 hover:bg-white/[0.04]"
         >
-          <BirdMark size={18} color="#FFFFFF" />
+          <BirdMark size={18} color="#F0B723" />
         </button>
 
         <div className="mx-1 h-5 w-px bg-white/10" aria-hidden />

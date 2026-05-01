@@ -27,6 +27,36 @@ const APP_NAMES_FALLBACK: Record<string, string> = {
   'obsidian.exe': 'Obsidian',
 }
 
+function Greeting() {
+  const now = new Date()
+  const hour = now.getHours()
+  const phrase =
+    hour < 5
+      ? 'Up late'
+      : hour < 12
+        ? 'Good morning'
+        : hour < 17
+          ? 'Good afternoon'
+          : hour < 21
+            ? 'Good evening'
+            : 'Good night'
+  const dateLine = now.toLocaleDateString([], {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
+  return (
+    <div className="flex flex-col">
+      <span className="font-geist text-[18px] font-semibold tracking-[-0.01em] text-white">
+        {phrase}
+      </span>
+      <span className="font-geist text-[11px] uppercase tracking-[0.18em] text-white/40">
+        {dateLine}
+      </span>
+    </div>
+  )
+}
+
 function fallbackDisplayName(raw: string): string {
   const key = raw.trim().toLowerCase()
   if (APP_NAMES_FALLBACK[key]) return APP_NAMES_FALLBACK[key]
@@ -111,7 +141,8 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-4">
+        <Greeting />
         <ReadinessPill />
       </div>
 
