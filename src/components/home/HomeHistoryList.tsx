@@ -37,6 +37,38 @@ function formatDuration(ms: number): string {
   return `${h}h ${m % 60}m`
 }
 
+/** Sub-second precision for short durations — "4.2s" reads better
+ *  than rounding to "4s" when comparing speech vs processing in the
+ *  expanded breakdown. Falls back to formatDuration for >= 60s. */
+function formatPreciseDuration(ms: number): string {
+  if (ms <= 0) return '0s'
+  if (ms < 60_000) {
+    const s = ms / 1000
+    return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`
+  }
+  return formatDuration(ms)
+}
+
+function formatFullTimestamp(timestamp: string): string {
+  const d = new Date(timestamp)
+  const date = d.toLocaleDateString([], {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  const time = d.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+  return `${date} · ${time}`
+}
+
+function computeWpm(wordCount: number, speechDurationMs: number): number | null {
+  if (speechDurationMs <= 0 || wordCount <= 0) return null
+  const minutes = speechDurationMs / 60_000
+  return Math.round(wordCount / minutes)
+}
+
 interface DaySection {
   key: string
   label: string
@@ -223,6 +255,10 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
                       >
                         <span aria-hidden />
                         <div className="overflow-hidden">
+                          <ExpandedDetails
+                            entry={entry}
+                            appDisplay={appDisplay}
+                          />
                           <div className="flex items-center gap-2 pt-1">
                             <button
                               type="button"
@@ -258,5 +294,70 @@ export function HomeHistoryList({ entries, onCopy, onDelete, resolveAppDisplay }
         </div>
       )}
     </section>
+  )
+}
+
+function ExpandedDetails({
+  entry,
+  appDisplay,
+}: {
+  entry: TranscriptionEntry
+  appDisplay: string | null
+}) {
+  const wpm = computeWpm(entry.wordCount, entry.speechDurationMs)
+  const processingMs = Math.max(0, entry.durationMs - entry.speechDurationMs)
+  const hasSpeechTiming = entry.speechDurationMs > 0
+  const hasProcessing = entry.durationMs > 0
+
+  const rows: { label: string; value: string }[] = []
+  rows.push({ label: 'Date', value: formatFullTimestamp(entry.timestamp) })
+  if (hasSpeechTiming) {
+    const speech = formatPreciseDuration(entry.speechDurationMs)
+    rows.push({
+      label: 'Speech',
+      value: wpm !== null ? `${speech} · ${wpm} wpm` : speech,
+    })
+  }
+  if (hasProcessing) {
+    rows.push({
+      label: entry.wasCleanedUp ? 'Polish + processing' : 'Processing',
+      value: formatPreciseDuration(processingMs),
+    })
+    rows.push({
+      label: 'Total',
+      value: formatPreciseDuration(entry.durationMs),
+    })
+  }
+  rows.push({
+    label: 'Words',
+    value: `${entry.wordCount.toLocaleString()}`,
+  })
+  if (entry.targetApp) {
+    rows.push({
+      label: 'App',
+      value: appDisplay
+        ? appDisplay !== entry.targetApp
+          ? `${appDisplay} · ${entry.targetApp}`
+          : entry.targetApp
+        : entry.targetApp,
+    })
+  }
+
+  return (
+    <dl className="mb-3 grid grid-cols-[110px_1fr] gap-x-4 gap-y-1.5 font-geist text-[11px]">
+      {rows.map((row) => (
+        <div key={row.label} className="contents">
+          <dt className="font-medium uppercase tracking-[0.16em] text-white/40">
+            {row.label}
+          </dt>
+          <dd
+            className="text-white/80"
+            style={{ fontFeatureSettings: '"tnum"' }}
+          >
+            {row.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   )
 }
