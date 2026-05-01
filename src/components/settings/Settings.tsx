@@ -119,9 +119,10 @@ export function Settings() {
       {/* Floating dock — bottom center */}
       <Dock />
 
-      {/* Saved indicator */}
+      {/* Saved indicator — anchored to bottom-right, vertically aligned
+          with the floating dock. */}
       {settingsSaved && (
-        <div className="fixed bottom-24 right-6 z-50 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 px-4 py-2 text-xs font-medium text-white shadow-elevated backdrop-blur-xl animate-saved-pop">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/80 px-4 py-2 text-xs font-medium text-white shadow-elevated backdrop-blur-xl animate-saved-pop">
           <Check size={14} className="text-chirp-success" />
           Saved
         </div>
