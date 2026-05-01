@@ -9,7 +9,6 @@ import { AboutModal } from '../shared/AboutModal'
 import { UpgradeModal } from '../shared/UpgradeModal'
 import { Dock } from '../dock/Dock'
 import { HomePage } from './HomePage'
-import { HistoryPage } from './HistoryPage'
 import { VocabularyPage } from './VocabularyPage'
 import { SnippetsPage } from './SnippetsPage'
 import { ProPage } from './ProPage'
@@ -17,7 +16,6 @@ import { SettingsPage } from './SettingsPage'
 
 const PAGES: Record<string, React.FC> = {
   home: HomePage,
-  history: HistoryPage,
   vocabulary: VocabularyPage,
   snippets: SnippetsPage,
   pro: ProPage,

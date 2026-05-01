@@ -3,8 +3,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from '../../stores/appStore'
 import { useTauri } from '../../hooks/useTauri'
 import { HeroMetric } from '../home/HeroMetric'
-import { PatternsRow } from '../home/PatternsRow'
-import { RecentsRow } from '../home/RecentsRow'
+import { QuickActions } from '../home/QuickActions'
+import { HomeHistoryList } from '../home/HomeHistoryList'
 import { ReadinessPill } from '../home/ReadinessPill'
 import { AttentionStrip } from '../home/AttentionStrip'
 import { TestDictationCard } from '../home/TestDictationCard'
@@ -79,26 +79,6 @@ export function HomePage() {
     return () => { cancelled = true }
   }, [period, history.length])
 
-  const recents = useMemo(() => {
-    // Dedupe by timestamp — when two dictations land in the same
-    // millisecond they share a React key, which causes the same row
-    // to render twice. Take the first occurrence per timestamp,
-    // then trim to the latest 3.
-    const seen = new Set<string>()
-    return [...history]
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .filter((e) => {
-        if (seen.has(e.timestamp)) return false
-        seen.add(e.timestamp)
-        return true
-      })
-      .slice(0, 3)
-  }, [history])
-
-  const longestDictationWords = useMemo(() => {
-    return history.reduce((max, e) => Math.max(max, e.wordCount), 0)
-  }, [history])
-
   const handleCopy = useCallback(async (entry: { text: string }) => {
     try {
       await navigator.clipboard.writeText(entry.text)
@@ -127,11 +107,6 @@ export function HomePage() {
     }
   }, [setSettingsPage])
 
-  const handleViewAll = useCallback(() => {
-    // History page lands in Phase 6 — for now this is a no-op slot.
-    setSettingsPage('history')
-  }, [setSettingsPage])
-
   const isEmpty = history.length === 0
 
   return (
@@ -154,24 +129,16 @@ export function HomePage() {
           />
         </div>
 
-        <PatternsRow
-          hourlyGrid={patterns?.hourlyGrid ?? Array.from({ length: 7 }, () => Array(24).fill(0))}
-          topApps={patterns?.topApps ?? []}
-          totalWords={patterns?.totalWords ?? 0}
-          totalSessions={patterns?.totalSessions ?? 0}
-          longestDictationWords={longestDictationWords}
-          totalDurationMs={patterns?.totalDurationMs ?? 0}
-        />
+        <QuickActions />
 
         <div className="animate-slide-up stagger-4">
           {isEmpty ? (
             <TestDictationCard />
           ) : (
-            <RecentsRow
-              entries={recents}
+            <HomeHistoryList
+              entries={history}
               onCopy={handleCopy}
               onDelete={handleDelete}
-              onViewAll={handleViewAll}
               resolveAppDisplay={resolveAppDisplay}
             />
           )}
