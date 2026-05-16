@@ -18,10 +18,13 @@ fn main() {
     };
 
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
+    println!("cargo:rustc-link-lib=dylib=sherpa-onnx-c-api");
+    println!("cargo:rustc-link-lib=dylib=onnxruntime");
 
     // Embed rpath so the binary can find dylibs inside the .app bundle at runtime
     if cfg!(target_os = "macos") {
-        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Resources/sherpa-onnx-lib/macos");
+        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/");
+        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks/");
     }
 
     tauri_build::build()

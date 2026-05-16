@@ -60,9 +60,6 @@ pub fn load_model(model: &str, beam_search: bool) -> Result<SherpaRecognizer, St
         return Err("tokens.txt not found".to_string());
     }
 
-    // Use at most half the available threads (min 2, max 6) so the LLM server
-    // and OS have headroom. On the Intel Core Ultra 7 256V (8 threads) this
-    // gives sherpa 4 threads instead of 8.
     let n_threads = std::thread::available_parallelism()
         .map(|n| (n.get() / 2).clamp(2, 6) as i32)
         .unwrap_or(4);
@@ -73,34 +70,35 @@ pub fn load_model(model: &str, beam_search: bool) -> Result<SherpaRecognizer, St
         "greedy_search"
     };
 
-    log::info!(
-        "Loading Parakeet TDT model from {} with {} threads, decoding={}",
-        dir.display(),
-        n_threads,
-        decoding_method,
-    );
+    let encoder_str = encoder.to_string_lossy().into_owned();
+    let decoder_str = decoder.to_string_lossy().into_owned();
+    let joiner_str = joiner.to_string_lossy().into_owned();
+    let tokens_str = tokens.to_string_lossy().into_owned();
 
-    let config = OfflineRecognizerConfig {
-        model_config: OfflineModelConfig {
-            transducer: OfflineTransducerModelConfig {
-                encoder: Some(encoder.to_string_lossy().into_owned()),
-                decoder: Some(decoder.to_string_lossy().into_owned()),
-                joiner: Some(joiner.to_string_lossy().into_owned()),
-            },
-            tokens: Some(tokens.to_string_lossy().into_owned()),
-            num_threads: n_threads,
-            provider: Some("cpu".to_string()),
-            debug: false,
-            ..Default::default()
-        },
-        decoding_method: Some(decoding_method.to_string()),
-        max_active_paths: if beam_search { 8 } else { 4 },
-        ..Default::default()
-    };
+    log::info!("Model paths:");
+    log::info!("  Encoder: {}", encoder_str);
+    log::info!("  Decoder: {}", decoder_str);
+    log::info!("  Joiner:  {}", joiner_str);
+    log::info!("  Tokens:  {}", tokens_str);
 
-    OfflineRecognizer::create(&config)
-        .map(SherpaRecognizer)
-        .ok_or_else(|| "Failed to create sherpa-onnx recognizer — check model files".to_string())
+    let mut config = OfflineRecognizerConfig::default();
+    config.model_config.transducer.encoder = Some(encoder_str);
+    config.model_config.transducer.decoder = Some(decoder_str);
+    config.model_config.transducer.joiner = Some(joiner_str);
+    config.model_config.tokens = Some(tokens_str);
+    config.model_config.num_threads = n_threads;
+    config.model_config.debug = false;
+    config.model_config.provider = Some("cpu".to_string());
+    
+    config.decoding_method = Some(decoding_method.to_string());
+    config.max_active_paths = if beam_search { 8 } else { 4 };
+
+    log::info!("Creating OfflineRecognizer...");
+    let recognizer = OfflineRecognizer::create(&config)
+        .ok_or_else(|| "Failed to create sherpa-onnx recognizer — check model files".to_string())?;
+    
+    log::info!("Successfully created OfflineRecognizer");
+    Ok(SherpaRecognizer(recognizer))
 }
 
 /// Find a model file matching a prefix (e.g. "encoder") with .onnx extension
