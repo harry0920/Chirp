@@ -29,7 +29,7 @@ log = "0.4"
 cpal = "0.15"
 rubato = "0.15"
 hound = "3.5"
-sherpa-onnx = "0.1.10"
+sherpa-onnx = "1.13.2"
 enigo = "0.6.1"
 tokio = { version = "1", features = ["sync", "time", "fs", "process"] }
 reqwest = { version = "0.12", features = ["stream", "json"] }
